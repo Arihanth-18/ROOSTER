@@ -1,0 +1,3 @@
+# Vosk wake-word model: never alter line endings
+android/app/src/main/assets/** binary
+*.sh text eol=lf

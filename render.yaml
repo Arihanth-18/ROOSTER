@@ -1,0 +1,23 @@
+# Render Blueprint: New → Blueprint → pick this repository.
+# Render will ask for GROQ_API_KEY (never stored in git).
+services:
+  - type: web
+    name: rooster-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_REASONING_EFFORT
+        value: low
+      - key: GROQ_TIMEOUT_MS
+        value: "12000"

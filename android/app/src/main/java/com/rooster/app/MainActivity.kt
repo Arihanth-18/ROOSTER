@@ -7,16 +7,24 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 class MainActivity : ReactActivity() {
 
-  /**
-   * Returns the name of the main component registered from JavaScript. This is used to schedule
-   * rendering of the component.
-   */
+  companion object {
+    /** True while ROOSTER is on screen — the wake service can then bring up the pop-up without overlay permission. */
+    @Volatile var isVisible = false
+      private set
+  }
+
   override fun getMainComponentName(): String = "Rooster"
 
-  /**
-   * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
-   * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
-   */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  override fun onResume() {
+    super.onResume()
+    isVisible = true
+  }
+
+  override fun onPause() {
+    isVisible = false
+    super.onPause()
+  }
 }

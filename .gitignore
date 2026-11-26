@@ -78,3 +78,9 @@ yarn-error.log
 .env
 backend/.env
 
+build-log.txt
+
+# release signing (never commit)
+android/keystore.properties
+*.keystore
+!android/app/debug.keystore

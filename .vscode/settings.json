@@ -1,0 +1,5 @@
+{
+  // Gradle is driven from the command line; VS Code's Java import locks the build and stalls it.
+  "java.import.gradle.enabled": false,
+  "java.autobuild.enabled": false
+}
