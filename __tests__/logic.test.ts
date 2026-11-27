@@ -232,6 +232,16 @@ describe('media, search, directions and torch', () => {
     expect(p('टॉर्च बंद करो')?.parameters).toEqual({ state: 'off' });
   });
 
+  it('handles "open <app> and play/search ..."', () => {
+    expect(p('open spotify and play music')).toMatchObject({ intent: 'play_media', parameters: { query: 'music', app_name: 'Spotify' } });
+    expect(p('open Spotify and play Arijit Singh songs')?.parameters).toEqual({ query: 'Arijit Singh songs', app_name: 'Spotify' });
+    expect(p('open youtube and search cooking videos')).toMatchObject({ intent: 'search_app', parameters: { query: 'cooking videos', app_name: 'YouTube' } });
+    expect(p('open YouTube and then play bhajans')?.parameters).toEqual({ query: 'bhajans', app_name: 'YouTube' });
+    expect(p('यूट्यूब खोलो और भजन चलाओ')).toMatchObject({ intent: 'play_media', parameters: { query: 'भजन', app_name: 'YouTube' } });
+    expect(p('open spotify and play')?.parameters).toEqual({ query: 'music', app_name: 'Spotify' });
+    expect(p('open WhatsApp')?.intent).toBe('open_application');
+  });
+
   it('still routes alarms, calls and app opening correctly', () => {
     expect(p('सुबह 7 बजे का अलार्म लगाओ')?.intent).toBe('set_alarm');
     expect(p('रमेश को फोन करो')?.intent).toBe('call_contact');

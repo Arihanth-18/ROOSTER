@@ -1,6 +1,6 @@
 import type { IntentParameters, IntentResult, Intent, ScreenName } from '../types';
 import { toLocalDateTime } from '../utils/dates';
-import { extractApp } from '../utils/mediaApps';
+import { extractApp, findAppTarget } from '../utils/mediaApps';
 
 /**
  * Rule-based fallback used when the AI backend is unreachable. It covers only the core,
@@ -187,6 +187,29 @@ const ROOSTER_SCREEN = /^(?:the\s+)?(?:home|settings|reminders|notes|reader|emer
 const TORCH = /\b(?:torch|flash ?light)\b|टॉर्च|ಟಾರ್ಚ್/i;
 const TORCH_OFF = /\boff\b|बंद|बुझा|ಆಫ್|ಆರಿಸು|ಆರಿಸಿ/i;
 
+/** "open Spotify and play Arijit", "YouTube खोलो और भजन चलाओ": the app from the first half, the action from the second. */
+const OPEN_AND_DO: RegExp[] = [
+  /^(?:please\s+)?(?:open|launch|start|go to)\s+(.+?)\s*,?\s+(?:and\s+(?:then\s+)?|then\s+)(.+?)[\s.!]*$/i,
+  /^(.+?)\s+(?:खोलो|खोल दो|खोलें|खोलकर)\s+(?:और\s+|फिर\s+)?(.+?)[\s।!]*$/,
+  /^(.+?)\s+(?:ತೆರೆ|ತೆರೆಯಿರಿ|ತೆರೆದು|ಓಪನ್ ಮಾಡಿ)\s+(?:ಮತ್ತು\s+|ನಂತರ\s+)?(.+?)[\s.!]*$/,
+];
+
+export function parseOpenAndDo(text: string): IntentResult | null {
+  for (const re of OPEN_AND_DO) {
+    const m = re.exec(text.trim());
+    if (!m) continue;
+    const appWords = m[1].trim();
+    let action = m[2].trim();
+    // "open Spotify and play" / "...and search" with nothing after: play/search "music"/ask later.
+    if (/^(?:play|search|चलाओ|बजाओ|ಪ್ಲೇ ಮಾಡಿ)$/i.test(action)) action = `${action} music`;
+    const r = parseMedia(action);
+    if (!r || (r.intent !== 'play_media' && r.intent !== 'search_app')) continue;
+    const app = findAppTarget(appWords);
+    return { ...r, parameters: { ...r.parameters, app_name: app?.label ?? appWords } };
+  }
+  return null;
+}
+
 /** Torch, directions, play and search. (Media controls are checked earlier in parseOffline.) */
 function parseMedia(text: string): IntentResult | null {
   if (TORCH.test(text) && /\b(?:turn|switch|on|off)\b|जलाओ|चालू|ऑन|बंद|बुझा|ಆನ್|ಆಫ್|ಹಚ್ಚು|ಹಚ್ಚಿ|ಆರಿಸು|ಆರಿಸಿ/i.test(text)) {
@@ -278,6 +301,8 @@ export function parseOffline(input: string, now: Date = new Date()): IntentResul
   }
   if (REMIND.test(text)) return parseReminder(text, now);
   if (ALARM.test(text)) return parseAlarm(text, now);
+  const openAndDo = parseOpenAndDo(text);
+  if (openAndDo) return openAndDo;
   const media = parseMedia(text);
   if (media) return media;
   if (READ_TEXT.test(text)) return result('read_text');

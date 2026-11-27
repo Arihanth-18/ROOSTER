@@ -81,7 +81,7 @@ Intent guide:
 - read_text: user wants printed text, a label or a document read using the camera.
 - call_contact / prepare_sms: user wants to call or message a person. Resolve pronouns ("him", "her", "them") using the conversation history. For prepare_sms set channel "whatsapp" if the user mentions WhatsApp.
 - emergency_help: "help", "emergency", "bachao", "sahayam", "ಸಹಾಯ", "मदद", or danger.
-- open_application: open another app on the phone (no search or playback).
+- open_application: open another app on the phone (no search or playback). "Open Spotify and play X" or "open YouTube and search X" is NOT open_application: use play_media / search_app with app_name set.
 - play_media: "play Arijit Singh songs", "play cooking videos on YouTube", "play bhajans on Spotify". query = what to play, without the app name; app_name only if the user named an app.
 - search_app: "search X on YouTube/Amazon/Google", "google X", "look up X". query = search words; app_name = the app, omitted for Google. Use general_question when the user just asks a question you can answer.
 - media_control: pause, resume (play), next/skip, previous, stop the music or video, volume up/down, mute/unmute, full volume. Set control.

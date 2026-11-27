@@ -34,7 +34,7 @@ import { formatTime, parseLocalDateTime } from '../utils/dates';
 import { needsConfirmation } from './policy';
 import { ensurePermission } from './permissions';
 import { callConfirmed, messageConfirmed } from './comms';
-import { mentionsWhatsApp } from '../services/offlineParser';
+import { mentionsWhatsApp, parseOpenAndDo } from '../services/offlineParser';
 import { findAppTarget, pickPlayer } from '../utils/mediaApps';
 
 export type ExecContext = {
@@ -325,6 +325,9 @@ export async function execute(ctx: ExecContext, r: IntentResult, draft: Draft | 
     case 'open_application': {
       const name = p.app_name?.trim();
       if (!name) return { say: t('didnt_understand') };
+      // "open Spotify and play X" must search/play, not just open the app.
+      const compound = parseOpenAndDo(ctx.utterance) ?? parseOpenAndDo(`open ${name}`);
+      if (compound) return execute(ctx, { ...compound, confidence: r.confidence, source: r.source }, null);
       const apps = await getLaunchableApps();
       const hits = fuzzyFind(name, apps.map(a => ({ ...a, name: a.label })));
       if (!hits.length) return { say: t('app_not_found', { app: name }) };

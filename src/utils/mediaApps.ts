@@ -32,7 +32,8 @@ export const APP_TARGETS: AppTarget[] = [
   {
     key: 'spotify', label: 'Spotify', packageName: 'com.spotify.music', kind: 'music',
     names: ['spotify', 'स्पॉटिफाई', 'स्पोटिफाई', 'ಸ್ಪಾಟಿಫೈ'],
-    canPlay: true, searchUrl: q => `spotify:search:${enc(q)}`,
+    // Tested: play-from-search only shows results on the free plan, so open search directly.
+    searchUrl: q => `spotify:search:${enc(q)}`,
   },
   {
     key: 'jiosaavn', label: 'JioSaavn', packageName: 'com.jio.media.jiobeats', kind: 'music',
