@@ -52,8 +52,8 @@ export const DEFAULT_PREFS: AccessibilityPrefs = {
   reducedMotion: false,
 };
 
-/** Reached from the phone through `adb reverse tcp:3000 tcp:3000`. Change in Settings for a deployed server. */
-export const DEFAULT_SERVER_URL = 'http://localhost:3000';
+/** Deployed backend on Render. For local development, set `http://localhost:3000` in Settings (with `adb reverse tcp:3000 tcp:3000`). */
+export const DEFAULT_SERVER_URL = 'https://rooster-backend-4fuh.onrender.com';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   language: 'en',

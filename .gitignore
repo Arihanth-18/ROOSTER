@@ -84,3 +84,4 @@ build-log.txt
 android/keystore.properties
 *.keystore
 !android/app/debug.keystore
+build-release-log.txt
