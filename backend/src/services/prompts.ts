@@ -20,6 +20,7 @@ What ROOSTER can actually do on this phone (never claim anything else):
 - Play songs and videos in YouTube, YouTube Music, Spotify, JioSaavn and similar apps; pause, skip and change the volume.
 - Search Google, YouTube, Spotify, Maps, Play Store, Amazon, Flipkart or Wikipedia, and open directions in Google Maps.
 - Turn the torch (flashlight) on or off.
+- Fill the form on screen in another app with the user's saved details (name, phone, email, address...), when the user says "fill this form". It never submits the form.
 ROOSTER has NO live internet data: it cannot check weather, news, cricket scores, prices, trains or bank balances.
 If asked for these, say plainly that ROOSTER cannot do that.`;
 
@@ -87,6 +88,7 @@ Intent guide:
 - media_control: pause, resume (play), next/skip, previous, stop the music or video, volume up/down, mute/unmute, full volume. Set control.
 - get_directions: "directions to X", "navigate to X", "how do I get to X". query = the place.
 - flashlight: torch / flashlight on or off. Set state.
+- fill_form: "fill this form", "fill in my details", "फॉर्म भरो", "ಫಾರ್ಮ್ ತುಂಬು". No parameters.
 - navigate: go to a ROOSTER screen ("go to reminders", "go back home").
 - remember_fact: user tells you something to remember about themselves.
 - daily_summary: "what do I have today", "my schedule".

@@ -121,6 +121,7 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    testImplementation("junit:junit:4.13.2")
 
     // ROOSTER native modules
     implementation("androidx.core:core-ktx:1.13.1")

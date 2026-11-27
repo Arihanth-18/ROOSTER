@@ -46,6 +46,18 @@ export interface Spec extends TurboModule {
   /** up | down | mute | unmute | max. Resolves the new media volume in percent. */
   adjustVolume(action: string): Promise<number>;
   setFlashlight(on: boolean): Promise<boolean>;
+  /** JSON of the user's saved form details (name, phone, email, address, city, state, pincode, dob). */
+  getFormProfile(): Promise<string>;
+  /** Saves the details encrypted on the phone. */
+  saveFormProfile(json: string): Promise<boolean>;
+  /** Whether ROOSTER is the phone's autofill service. */
+  isAutofillServiceEnabled(): Promise<boolean>;
+  openAutofillSettings(): void;
+  /** Whether ROOSTER's voice form filling (accessibility service) is turned on. */
+  isAccessibilityServiceEnabled(): Promise<boolean>;
+  openAccessibilitySettings(): void;
+  /** Fills the form in the app behind ROOSTER. JSON { app, filled: [{ key, label }], skipped } or { error }. */
+  fillFormOnScreen(): Promise<string>;
   /** JSON: [{ label, packageName, preferred }] — installed notes apps (Keep, OnePlus Notes, Samsung Notes...). */
   getNotesApps(): Promise<string>;
   /** Shares the note into that notes app, where the user saves it; remembers it as the preferred app. */

@@ -28,7 +28,8 @@
 
     <!--
       Deliberately NOT requested: CAMERA (system camera app is used), storage (system photo picker),
-      READ_PHONE_STATE, AccessibilityService.
+      READ_PHONE_STATE. The AccessibilityService is used only for voice form filling, is off until the
+      user enables it, and reads the screen only when the user says "fill this form".
     -->
 
     <!-- Package visibility (Android 11+) for the intents ROOSTER launches. -->
@@ -124,6 +125,30 @@
         android:name=".wake.WakeWordService"
         android:exported="false"
         android:foregroundServiceType="microphone" />
+
+      <!-- "Fill with ROOSTER" suggestions in other apps' forms (user picks it under Settings → Autofill service). -->
+      <service
+        android:name=".forms.RoosterAutofillService"
+        android:label="ROOSTER"
+        android:permission="android.permission.BIND_AUTOFILL_SERVICE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.service.autofill.AutofillService" />
+        </intent-filter>
+        <meta-data android:name="android.autofill" android:resource="@xml/autofill_service" />
+      </service>
+
+      <!-- Voice form filling ("fill this form"), only after the user turns it on under Settings → Accessibility. -->
+      <service
+        android:name=".forms.RoosterAccessibilityService"
+        android:label="ROOSTER form filling"
+        android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.accessibilityservice.AccessibilityService" />
+        </intent-filter>
+        <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service" />
+      </service>
 
       <provider
         android:name="androidx.core.content.FileProvider"

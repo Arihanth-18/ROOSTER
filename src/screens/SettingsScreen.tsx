@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,8 +12,17 @@ import { applyWakeMode, canDrawOverlays, getWakeStatus, openOverlaySettings, typ
 import { LANGUAGE_OPTIONS } from '../localization/i18n';
 import { checkHealth, type ServerHealth } from '../services/assistantClient';
 import {
+  FORM_KEYS,
   getActiveNotifications,
+  getFormProfile,
   getLaunchableApps,
+  isAccessibilityServiceEnabled,
+  isAutofillServiceEnabled,
+  openAccessibilitySettings,
+  openAutofillSettings,
+  saveFormProfile,
+  type FormKey,
+  type FormProfile,
   hasPermission,
   isNotificationAccessEnabled,
   openAppSettings,
@@ -39,6 +48,9 @@ export function SettingsScreen() {
   const [perms, setPerms] = useState<Record<PermissionKind, boolean> | null>(null);
   const [wakeStatus, setWakeStatus] = useState<WakeStatus>('off');
   const [overlayOk, setOverlayOk] = useState(true);
+  const [profile, setProfile] = useState<FormProfile>({});
+  const [autofillOn, setAutofillOn] = useState(false);
+  const [voiceFillOn, setVoiceFillOn] = useState(false);
   const c = theme.colors;
 
   const refreshWake = useCallback(() => {
@@ -70,9 +82,20 @@ export function SettingsScreen() {
     setHealth('checking');
     checkHealth(settings.serverUrl).then(setHealth);
     refreshWake();
+    isAutofillServiceEnabled().then(setAutofillOn).catch(() => {});
+    isAccessibilityServiceEnabled().then(setVoiceFillOn).catch(() => {});
   }, [settings.serverUrl, refreshWake]);
 
   useFocusEffect(refresh);
+
+  useEffect(() => {
+    getFormProfile().then(setProfile).catch(() => {});
+  }, []);
+
+  const saveProfile = async () => {
+    await saveFormProfile(profile);
+    void speak(t('form_saved'));
+  };
 
   // Offer apps that currently have notifications first, then the rest.
   const loadApps = async () => {
@@ -93,6 +116,8 @@ export function SettingsScreen() {
     if (!ok.confirmed) return;
     await deleteAllReminders();
     await wipeAllData();
+    await saveFormProfile({}).catch(() => {});
+    setProfile({});
     updateSettings({ allowedNotificationApps: [] });
     void speak(t('data_deleted'));
   };
@@ -168,6 +193,35 @@ export function SettingsScreen() {
             ))}
           </>
         ) : null}
+      </Card>
+
+      <Card>
+        <Heading>📝 {t('form_title')}</Heading>
+        <Body muted>{t('form_hint')}</Body>
+        {FORM_KEYS.map((k: FormKey) => (
+          <Field
+            key={k}
+            label={t(`form_${k}` as 'form_name')}
+            value={profile[k] ?? ''}
+            onChangeText={v => setProfile(prev => ({ ...prev, [k]: v }))}
+            keyboardType={k === 'phone' || k === 'pincode' ? 'phone-pad' : k === 'email' ? 'email-address' : 'default'}
+            autoCapitalize={k === 'email' ? 'none' : 'words'}
+            autoCorrect={false}
+            placeholder={k === 'dob' ? '15/08/1955' : undefined}
+          />
+        ))}
+        <Body muted>{t('form_dob_hint')}</Body>
+        <BigButton label={t('form_save')} onPress={saveProfile} />
+
+        <Heading>{t('form_autofill')}</Heading>
+        <Body muted>{t('form_autofill_hint')}</Body>
+        <Body bold>{autofillOn ? '✓ ON' : '✕ OFF'}</Body>
+        <BigButton variant="secondary" label={t('open_settings')} onPress={openAutofillSettings} />
+
+        <Heading>{t('form_voice')}</Heading>
+        <Body muted>{t('form_voice_hint')}</Body>
+        <Body bold>{voiceFillOn ? '✓ ON' : '✕ OFF'}</Body>
+        <BigButton variant="secondary" label={t('open_settings')} onPress={openAccessibilitySettings} />
       </Card>
 
       <Card>

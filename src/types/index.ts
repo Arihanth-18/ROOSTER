@@ -22,6 +22,7 @@ export type Intent =
   | 'media_control'
   | 'get_directions'
   | 'flashlight'
+  | 'fill_form'
   | 'navigate'
   | 'remember_fact'
   | 'daily_summary'

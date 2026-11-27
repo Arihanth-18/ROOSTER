@@ -23,6 +23,7 @@ export const INTENTS = [
   'media_control',
   'get_directions',
   'flashlight',
+  'fill_form',
   'navigate',
   'remember_fact',
   'daily_summary',

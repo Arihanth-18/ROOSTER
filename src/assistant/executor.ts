@@ -11,7 +11,11 @@ import {
   isNotificationAccessEnabled,
   launchApp,
   adjustVolume,
+  fillFormOnScreen,
+  getFormProfile,
   getNotesApps,
+  isAccessibilityServiceEnabled,
+  openAccessibilitySettings,
   mediaControl,
   openUrl,
   openWhatsAppChat,
@@ -267,6 +271,9 @@ export async function execute(ctx: ExecContext, r: IntentResult, draft: Draft | 
       return { say: ok ? t(on ? 'flashlight_on' : 'flashlight_off') : t('flashlight_failed') };
     }
 
+    case 'fill_form':
+      return fillForm(ctx);
+
     case 'set_alarm':
       return setAlarm(ctx, r);
 
@@ -444,6 +451,40 @@ async function searchApp(ctx: ExecContext, r: IntentResult): Promise<ExecResult>
   if (!(await confirm(ctx, r, t('confirm_search', { query, app: target.label })))) return { say: t('cancelled') };
   const ok = await openUrl(target.searchUrl(query), installed ? target.packageName : '');
   return { say: ok ? t('search_opened', { app: target.label, query }) : t('action_failed') };
+}
+
+// ---------------------------------------------------------------------------- form filling
+
+const FIELD_LABEL: Record<string, StringKey> = {
+  name: 'form_name', first_name: 'form_first_name', last_name: 'form_last_name', phone: 'form_phone',
+  email: 'form_email', address: 'form_address', city: 'form_city', state: 'form_state',
+  pincode: 'form_pincode', dob: 'form_dob',
+};
+
+/** "Fill this form": fills the app behind ROOSTER with the user's saved details, then says what it filled. */
+async function fillForm(ctx: ExecContext): Promise<ExecResult> {
+  const { t } = ctx;
+  const profile = await getFormProfile().catch(() => ({}));
+  if (!Object.keys(profile).length) {
+    navigate('Settings');
+    return { say: t('form_fill_needs_profile') };
+  }
+  if (!(await isAccessibilityServiceEnabled().catch(() => false))) {
+    openAccessibilitySettings();
+    return { say: t('form_fill_needs_access') };
+  }
+  const res = await fillFormOnScreen().catch(() => ({ error: 'failed' as const }));
+  if ('error' in res) {
+    if (res.error === 'no_window' || res.error === 'rooster_in_front') return { say: t('form_fill_no_form') };
+    if (res.error === 'not_enabled') {
+      openAccessibilitySettings();
+      return { say: t('form_fill_needs_access') };
+    }
+    return { say: t('action_failed') };
+  }
+  if (!res.filled.length) return { say: t('form_fill_nothing') };
+  const fields = [...new Set(res.filled.map(f => t(FIELD_LABEL[f.key] ?? 'form_name')))].join(', ');
+  return { say: t('form_filled', { count: res.filled.length, fields }) };
 }
 
 // ---------------------------------------------------------------------------- clock app & notes app

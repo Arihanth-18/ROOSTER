@@ -110,6 +110,30 @@ export const adjustVolume = (action: VolumeAction) => NativeDevice.adjustVolume(
 
 export const setFlashlight = (on: boolean) => NativeDevice.setFlashlight(on);
 
+// ---------------------------------------------------------------------------- form filling
+
+export const FORM_KEYS = ['name', 'phone', 'email', 'address', 'city', 'state', 'pincode', 'dob'] as const;
+export type FormKey = (typeof FORM_KEYS)[number];
+export type FormProfile = Partial<Record<FormKey, string>>;
+
+export async function getFormProfile(): Promise<FormProfile> {
+  return JSON.parse(await NativeDevice.getFormProfile()) as FormProfile;
+}
+
+export const saveFormProfile = (p: FormProfile) => NativeDevice.saveFormProfile(JSON.stringify(p));
+export const isAutofillServiceEnabled = () => NativeDevice.isAutofillServiceEnabled();
+export const openAutofillSettings = () => NativeDevice.openAutofillSettings();
+export const isAccessibilityServiceEnabled = () => NativeDevice.isAccessibilityServiceEnabled();
+export const openAccessibilitySettings = () => NativeDevice.openAccessibilitySettings();
+
+export type FillResult =
+  | { error: 'not_enabled' | 'no_profile' | 'no_window' | 'rooster_in_front' | 'failed' }
+  | { app: string; filled: Array<{ key: FormKey | 'first_name' | 'last_name'; label: string }>; skipped: number };
+
+export async function fillFormOnScreen(): Promise<FillResult> {
+  return JSON.parse(await NativeDevice.fillFormOnScreen()) as FillResult;
+}
+
 // ---------------------------------------------------------------------------- phone's notes app
 
 export type NotesApp = { label: string; packageName: string; preferred: boolean };

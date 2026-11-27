@@ -249,6 +249,15 @@ describe('media, search, directions and torch', () => {
   });
 });
 
+describe('form filling command', () => {
+  it('understands "fill this form" in three languages', () => {
+    for (const s of ['fill this form', 'fill in the form', 'fill my details', 'autofill', 'फॉर्म भरो', 'ಫಾರ್ಮ್ ತುಂಬು']) {
+      expect([s, parseOffline(s)?.intent]).toEqual([s, 'fill_form']);
+    }
+    expect(parseOffline('take a note fill the tank')?.intent).toBe('create_note');
+  });
+});
+
 describe('media app choice', () => {
   const yt = 'com.google.android.youtube';
   const ytm = 'com.google.android.apps.youtube.music';

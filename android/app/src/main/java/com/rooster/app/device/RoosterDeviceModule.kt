@@ -8,6 +8,10 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.provider.MediaStore
 import android.view.KeyEvent
+import android.view.autofill.AutofillManager
+import android.content.ComponentName
+import com.rooster.app.forms.FormProfile
+import com.rooster.app.forms.RoosterAccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -299,6 +303,66 @@ class RoosterDeviceModule(private val ctx: ReactApplicationContext) : NativeRoos
       promise.resolve(true)
     } catch (_: Exception) {
       promise.resolve(false)
+    }
+  }
+
+  // ------------------------------------------------------------ form filling (user's own details)
+
+  override fun getFormProfile(promise: Promise) {
+    io.execute { promise.resolve(FormProfile.toJson(FormProfile.load(ctx))) }
+  }
+
+  override fun saveFormProfile(json: String, promise: Promise) {
+    io.execute {
+      try { FormProfile.save(ctx, json); promise.resolve(true) } catch (e: Exception) {
+        promise.reject("profile_failed", e.message ?: "Could not save details", e)
+      }
+    }
+  }
+
+  override fun isAutofillServiceEnabled(promise: Promise) {
+    val am = ctx.getSystemService(AutofillManager::class.java)
+    promise.resolve(am?.hasEnabledAutofillServices() == true)
+  }
+
+  override fun openAutofillSettings() {
+    val i = Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE, Uri.parse("package:${ctx.packageName}"))
+    if (!launch(i)) launch(Intent(Settings.ACTION_SETTINGS))
+  }
+
+  override fun isAccessibilityServiceEnabled(promise: Promise) {
+    val enabled = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+    val me = ComponentName(ctx, RoosterAccessibilityService::class.java)
+    promise.resolve(
+      enabled.split(':').any { ComponentName.unflattenFromString(it) == me } || RoosterAccessibilityService.instance != null,
+    )
+  }
+
+  override fun openAccessibilitySettings() {
+    if (!launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))) launch(Intent(Settings.ACTION_SETTINGS))
+  }
+
+  /**
+   * "Fill this form": steps ROOSTER aside, waits for the app underneath to be in front, fills the
+   * empty fields it recognises. JSON { app, filled: [{ key, label }], skipped } or { error }.
+   */
+  override fun fillFormOnScreen(promise: Promise) {
+    val service = RoosterAccessibilityService.instance
+    if (service == null) { promise.resolve("""{"error":"not_enabled"}"""); return }
+    val profile = FormProfile.load(ctx)
+    if (profile.isEmpty()) { promise.resolve("""{"error":"no_profile"}"""); return }
+    ctx.currentActivity?.let { a -> a.runOnUiThread { a.moveTaskToBack(true) } }
+    io.execute {
+      try {
+        val deadline = System.currentTimeMillis() + 3000
+        while (System.currentTimeMillis() < deadline && service.activePackage().let { it == null || it == ctx.packageName }) {
+          Thread.sleep(150)
+        }
+        Thread.sleep(400) // let the form finish drawing
+        promise.resolve(service.fillActiveForm(profile).toString())
+      } catch (e: Exception) {
+        promise.resolve(JSONObject().put("error", "failed").toString())
+      }
     }
   }
 

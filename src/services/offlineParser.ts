@@ -241,6 +241,9 @@ function parseMedia(text: string): IntentResult | null {
   return null;
 }
 
+const FILL_FORM =
+  /\b(?:fill|complete)\s+(?:in\s+|out\s+|up\s+)?(?:this|the|my)?\s*(?:form|details)\b|\bfill (?:it|this) (?:in|up)\b|\bautofill\b|(?:फॉर्म|फ़ॉर्म|फार्म)\s*(?:भरो|भर दो|भरें)|(?:ಫಾರ್ಮ್|ಅರ್ಜಿ)\s*(?:ತುಂಬು|ತುಂಬಿ|ಭರ್ತಿ)/i;
+
 const NOTE_PATTERNS: RegExp[] = [
   /^(?:please\s+)?(?:take|make|create|add|write|save)\s+(?:a\s+)?note(?:\s+(?:that|saying|of|about))?[\s:,-]*(.*?)[\s.!]*$/i,
   /^(?:please\s+)?(?:note down|write down|jot down|note)(?:\s+that)?[\s:,-]+(.+?)[\s.!]*$/i,
@@ -288,6 +291,7 @@ export function parseOffline(input: string, now: Date = new Date()): IntentResul
     const m = re.exec(text);
     if (m) return result('call_contact', { contact_name: m[1].trim() });
   }
+  if (FILL_FORM.test(text)) return result('fill_form');
   for (const re of NOTE_PATTERNS) {
     const m = re.exec(text);
     if (m) {
