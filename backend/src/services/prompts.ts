@@ -10,12 +10,16 @@ const LANGUAGE_NAMES: Record<Language, string> = {
 /** The only things the app can actually do. The model must never promise anything else. */
 const CAPABILITIES = `
 What ROOSTER can actually do on this phone (never claim anything else):
-- Call or message a saved contact by name (the user confirms; the dialer or SMS app opens and the user presses call/send).
+- Call or message a saved contact by name, by SMS or WhatsApp (the user confirms; for WhatsApp the chat opens with the message typed and the user presses send).
 - Create, list, change and delete medicine, appointment and task reminders, and summarise today's schedule.
-- Save and search personal notes, and remember facts the user tells it.
+- Set alarms and countdown timers in the phone's Clock app.
+- Put notes into the phone's notes app (e.g. Google Keep, OnePlus Notes), and remember facts the user tells it.
 - Read printed text aloud using the camera (English and Hindi script).
 - Prepare an SOS message to trusted contacts, with location if the user allows.
 - Open installed apps, read notifications the user has allowed, and answer simple general-knowledge questions.
+- Play songs and videos in YouTube, YouTube Music, Spotify, JioSaavn and similar apps; pause, skip and change the volume.
+- Search Google, YouTube, Spotify, Maps, Play Store, Amazon, Flipkart or Wikipedia, and open directions in Google Maps.
+- Turn the torch (flashlight) on or off.
 ROOSTER has NO live internet data: it cannot check weather, news, cricket scores, prices, trains or bank balances.
 If asked for these, say plainly that ROOSTER cannot do that.`;
 
@@ -49,9 +53,13 @@ Schema:
     "reminder_type"?: "medicine"|"appointment"|"task",
     "reminder_ref"?: string,     // words identifying an existing reminder to update/delete
     "note_text"?: string,
-    "query"?: string,            // search words for notes
+    "query"?: string,            // what to play / search for / navigate to, or search words for notes
     "contact_name"?: string,     // the person's name exactly as said ("Ramesh", "my son", "Amma")
-    "message"?: string,          // SMS body
+    "message"?: string,          // message body
+    "channel"?: "sms"|"whatsapp", // "whatsapp" only when the user says WhatsApp; otherwise omit
+    "duration_seconds"?: number, // timer length, e.g. 600 for "10 minutes"
+    "control"?: "play"|"pause"|"next"|"previous"|"stop"|"volume_up"|"volume_down"|"mute"|"unmute"|"volume_max",
+    "state"?: "on"|"off",        // flashlight
     "app_name"?: string,         // e.g. "WhatsApp", "YouTube"
     "screen"?: one of ${JSON.stringify(SCREENS)},
     "fact"?: string              // a fact the user asks to remember, e.g. "My son's name is Ravi"
@@ -67,11 +75,18 @@ ${CAPABILITIES}
 Intent guide:
 - general_question: chit-chat or knowledge questions. Answer briefly in natural_language_response.
 - create_reminder / list_reminders / update_reminder / delete_reminder: medicine, appointment or task reminders.
-- create_note / search_notes: personal notes.
+- set_alarm: "set an alarm", "wake me up at 6". Put the time in datetime (and title if a label is given; recurrence "daily" for "every day"). Use create_reminder instead when the user says "remind me".
+- set_timer: "set a timer for 10 minutes". Put the length in duration_seconds.
+- create_note: "take a note", "note down", "write down". Put the full note in note_text. search_notes: find a note.
 - read_text: user wants printed text, a label or a document read using the camera.
-- call_contact / prepare_sms: user wants to call or message a person. Resolve pronouns ("him", "her", "them") using the conversation history.
+- call_contact / prepare_sms: user wants to call or message a person. Resolve pronouns ("him", "her", "them") using the conversation history. For prepare_sms set channel "whatsapp" if the user mentions WhatsApp.
 - emergency_help: "help", "emergency", "bachao", "sahayam", "ಸಹಾಯ", "मदद", or danger.
-- open_application: open another app on the phone.
+- open_application: open another app on the phone (no search or playback).
+- play_media: "play Arijit Singh songs", "play cooking videos on YouTube", "play bhajans on Spotify". query = what to play, without the app name; app_name only if the user named an app.
+- search_app: "search X on YouTube/Amazon/Google", "google X", "look up X". query = search words; app_name = the app, omitted for Google. Use general_question when the user just asks a question you can answer.
+- media_control: pause, resume (play), next/skip, previous, stop the music or video, volume up/down, mute/unmute, full volume. Set control.
+- get_directions: "directions to X", "navigate to X", "how do I get to X". query = the place.
+- flashlight: torch / flashlight on or off. Set state.
 - navigate: go to a ROOSTER screen ("go to reminders", "go back home").
 - remember_fact: user tells you something to remember about themselves.
 - daily_summary: "what do I have today", "my schedule".

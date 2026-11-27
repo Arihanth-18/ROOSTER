@@ -1,7 +1,8 @@
-import { PermissionsAndroid, Platform, type Permission } from 'react-native';
+import { Linking, PermissionsAndroid, Platform, type Permission } from 'react-native';
 import NativeDevice from '../native/specs/NativeRoosterDevice';
 import NativeReminders from '../native/specs/NativeRoosterReminders';
 import type { DeviceContact } from '../types';
+import { toWhatsAppNumber } from '../utils/phone';
 
 // ---------------------------------------------------------------------------- permissions
 
@@ -63,6 +64,61 @@ export type SmsResult = { sent: number; failed: number; total: number; error?: s
 export async function sendSmsDirect(phones: string[], body: string): Promise<SmsResult> {
   return JSON.parse(await NativeDevice.sendSms(phones.join(','), body)) as SmsResult;
 }
+
+// ---------------------------------------------------------------------------- WhatsApp
+
+/**
+ * Opens the person's WhatsApp chat with the message already typed. The user presses send;
+ * nothing is ever sent automatically. Resolves 'not_installed' when no app handles the link.
+ */
+export async function openWhatsAppChat(phone: string, text: string): Promise<'opened' | 'bad_number' | 'not_installed'> {
+  const number = toWhatsAppNumber(phone);
+  if (!number) return 'bad_number';
+  try {
+    await Linking.openURL(`whatsapp://send?phone=${number}&text=${encodeURIComponent(text)}`);
+    return 'opened';
+  } catch {
+    return 'not_installed';
+  }
+}
+
+/** How long after opening a chat ROOSTER keeps reading that person's WhatsApp replies aloud. */
+export const REPLY_WATCH_MINUTES = 30;
+
+export const watchWhatsAppReplies = (name: string, locale: string, template: string) =>
+  NativeDevice.watchReplies(name, REPLY_WATCH_MINUTES, locale, template);
+
+// ---------------------------------------------------------------------------- clock app
+
+/** `days` are Calendar days (1 = Sunday) for a repeating alarm; empty for one-time. */
+export const setClockAlarm = (hour: number, minute: number, label: string, days: number[] = []) =>
+  NativeDevice.setAlarm(hour, minute, label, days.join(','));
+
+export const setClockTimer = (seconds: number, label: string) => NativeDevice.setTimer(seconds, label);
+
+// ---------------------------------------------------------------------------- media, search, torch
+
+export const playFromSearch = (packageName: string, query: string) => NativeDevice.playFromSearch(packageName, query);
+export const openUrl = (url: string, packageName = '') => NativeDevice.openUrl(url, packageName);
+export const webSearch = (query: string) => NativeDevice.webSearch(query);
+
+export type MediaAction = 'play' | 'pause' | 'toggle' | 'next' | 'previous' | 'stop';
+export const mediaControl = (action: MediaAction) => NativeDevice.mediaControl(action);
+
+export type VolumeAction = 'up' | 'down' | 'mute' | 'unmute' | 'max';
+export const adjustVolume = (action: VolumeAction) => NativeDevice.adjustVolume(action);
+
+export const setFlashlight = (on: boolean) => NativeDevice.setFlashlight(on);
+
+// ---------------------------------------------------------------------------- phone's notes app
+
+export type NotesApp = { label: string; packageName: string; preferred: boolean };
+
+export async function getNotesApps(): Promise<NotesApp[]> {
+  return JSON.parse(await NativeDevice.getNotesApps()) as NotesApp[];
+}
+
+export const saveToNotesApp = (packageName: string, text: string) => NativeDevice.saveToNotesApp(packageName, text);
 
 // ---------------------------------------------------------------------------- apps
 

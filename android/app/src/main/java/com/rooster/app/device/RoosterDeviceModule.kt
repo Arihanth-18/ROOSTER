@@ -2,6 +2,12 @@ package com.rooster.app.device
 
 import android.Manifest
 import android.app.Notification
+import android.app.SearchManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.media.AudioManager
+import android.provider.MediaStore
+import android.view.KeyEvent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -11,6 +17,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
+import android.provider.AlarmClock
 import android.provider.ContactsContract
 import android.provider.Settings
 import androidx.core.content.ContextCompat
@@ -26,7 +33,16 @@ import java.util.concurrent.Executors
 
 class RoosterDeviceModule(private val ctx: ReactApplicationContext) : NativeRoosterDeviceSpec(ctx) {
 
-  companion object { const val NAME = "RoosterDevice" }
+  companion object {
+    const val NAME = "RoosterDevice"
+    private const val NOTES_PREFS = "rooster_notes_app"
+    private const val KEY_NOTES_APP = "package"
+    private val KNOWN_NOTES_APPS = setOf(
+      "com.google.android.keep", "com.oneplus.note", "com.coloros.note", "com.oplus.note",
+      "com.samsung.android.app.notes", "com.miui.notes", "com.vivo.notes", "com.huawei.notepad",
+      "com.microsoft.office.onenote", "com.evernote", "com.realme.note",
+    )
+  }
 
   private val io = Executors.newSingleThreadExecutor()
 
@@ -172,6 +188,159 @@ class RoosterDeviceModule(private val ctx: ReactApplicationContext) : NativeRoos
     } catch (e: Exception) {
       promise.reject("notifications_failed", e.message ?: "Could not read notifications", e)
     }
+  }
+
+  override fun watchReplies(name: String, minutes: Double, locale: String, template: String) {
+    ReplyWatcher.watch(ctx, name, minutes.toInt().coerceIn(1, 240), locale, template)
+  }
+
+  // ------------------------------------------------------------ clock app (alarms, timers)
+
+  /** days: comma-separated java.util.Calendar days (1 = Sunday) for a repeating alarm, "" for once. */
+  override fun setAlarm(hour: Double, minute: Double, label: String, days: String, promise: Promise) {
+    val i = Intent(AlarmClock.ACTION_SET_ALARM)
+      .putExtra(AlarmClock.EXTRA_HOUR, hour.toInt())
+      .putExtra(AlarmClock.EXTRA_MINUTES, minute.toInt())
+      .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+    if (label.isNotBlank()) i.putExtra(AlarmClock.EXTRA_MESSAGE, label.take(60))
+    val dayList = days.split(',').mapNotNull { it.trim().toIntOrNull() }.filter { it in 1..7 }
+    if (dayList.isNotEmpty()) i.putExtra(AlarmClock.EXTRA_DAYS, ArrayList(dayList))
+    promise.resolve(launch(i))
+  }
+
+  override fun setTimer(seconds: Double, label: String, promise: Promise) {
+    val i = Intent(AlarmClock.ACTION_SET_TIMER)
+      .putExtra(AlarmClock.EXTRA_LENGTH, seconds.toInt().coerceIn(1, 86_400))
+      .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+    if (label.isNotBlank()) i.putExtra(AlarmClock.EXTRA_MESSAGE, label.take(60))
+    promise.resolve(launch(i))
+  }
+
+  // ------------------------------------------------------------ media apps, search, maps
+
+  /**
+   * Asks a media app (YouTube, YouTube Music, Spotify...) to find and START PLAYING the query,
+   * like Google Assistant does. Resolves false if that app does not support play-from-search.
+   */
+  override fun playFromSearch(packageName: String, query: String, promise: Promise) {
+    val i = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH)
+      .setPackage(packageName)
+      .putExtra(SearchManager.QUERY, query)
+      .putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
+    if (i.resolveActivity(ctx.packageManager) == null) { promise.resolve(false); return }
+    promise.resolve(launch(i))
+  }
+
+  /** Opens a link (search page, maps, store), in `packageName` when given and installed, else any app. */
+  override fun openUrl(url: String, packageName: String, promise: Promise) {
+    val i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    if (packageName.isNotBlank()) {
+      val inApp = Intent(i).setPackage(packageName)
+      if (inApp.resolveActivity(ctx.packageManager) != null && launch(inApp)) { promise.resolve(true); return }
+    }
+    promise.resolve(launch(i))
+  }
+
+  /** Google search in the Google app, falling back to the browser. */
+  override fun webSearch(query: String, promise: Promise) {
+    val g = Intent(Intent.ACTION_WEB_SEARCH).setPackage("com.google.android.googlequicksearchbox")
+      .putExtra(SearchManager.QUERY, query)
+    if (g.resolveActivity(ctx.packageManager) != null && launch(g)) { promise.resolve(true); return }
+    val url = "https://www.google.com/search?q=" + Uri.encode(query)
+    promise.resolve(launch(Intent(Intent.ACTION_VIEW, Uri.parse(url))))
+  }
+
+  // ------------------------------------------------------------ playback, volume, torch
+
+  /** play | pause | toggle | next | previous | stop — sent to whichever app is playing. */
+  override fun mediaControl(action: String) {
+    val code = when (action) {
+      "play" -> KeyEvent.KEYCODE_MEDIA_PLAY
+      "pause" -> KeyEvent.KEYCODE_MEDIA_PAUSE
+      "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
+      "previous" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+      "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
+      else -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+    }
+    val am = ctx.getSystemService(AudioManager::class.java)
+    am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+    am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+  }
+
+  /** up | down | mute | unmute | max for media volume. Resolves the new volume in percent. */
+  override fun adjustVolume(action: String, promise: Promise) {
+    try {
+      val am = ctx.getSystemService(AudioManager::class.java)
+      val s = AudioManager.STREAM_MUSIC
+      val ui = AudioManager.FLAG_SHOW_UI
+      when (action) {
+        "up" -> repeat(2) { am.adjustStreamVolume(s, AudioManager.ADJUST_RAISE, ui) }
+        "down" -> repeat(2) { am.adjustStreamVolume(s, AudioManager.ADJUST_LOWER, ui) }
+        "mute" -> am.adjustStreamVolume(s, AudioManager.ADJUST_MUTE, ui)
+        "unmute" -> am.adjustStreamVolume(s, AudioManager.ADJUST_UNMUTE, ui)
+        "max" -> am.setStreamVolume(s, am.getStreamMaxVolume(s), ui)
+      }
+      val max = am.getStreamMaxVolume(s).coerceAtLeast(1)
+      promise.resolve(Math.round(am.getStreamVolume(s) * 100.0 / max).toDouble())
+    } catch (e: Exception) {
+      promise.reject("volume_failed", e.message ?: "Could not change volume", e)
+    }
+  }
+
+  /** Torch on/off. Needs no permission. Resolves false if the phone has no flash. */
+  override fun setFlashlight(on: Boolean, promise: Promise) {
+    try {
+      val cm = ctx.getSystemService(CameraManager::class.java)
+      val id = cm.cameraIdList.firstOrNull {
+        cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+      }
+      if (id == null) { promise.resolve(false); return }
+      cm.setTorchMode(id, on)
+      promise.resolve(true)
+    } catch (_: Exception) {
+      promise.resolve(false)
+    }
+  }
+
+  // ------------------------------------------------------------ phone's notes app
+
+  /** JSON [{ label, packageName, preferred }]: apps that accept shared text and look like notes apps. */
+  override fun getNotesApps(promise: Promise) {
+    try {
+      val pm = ctx.packageManager
+      val preferred = ctx.getSharedPreferences(NOTES_PREFS, Context.MODE_PRIVATE).getString(KEY_NOTES_APP, null)
+      val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+      val out = JSONArray()
+      val seen = HashSet<String>()
+      for (ri in pm.queryIntentActivities(send, 0)) {
+        val pkg = ri.activityInfo.packageName
+        if (pkg == ctx.packageName || !seen.add(pkg)) continue
+        val label = try { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() } catch (_: Exception) { pkg }
+        if (!looksLikeNotesApp(pkg, label)) continue
+        out.put(JSONObject().put("label", label).put("packageName", pkg).put("preferred", pkg == preferred))
+      }
+      promise.resolve(out.toString())
+    } catch (e: Exception) {
+      promise.reject("notes_apps_failed", e.message ?: "Could not list notes apps", e)
+    }
+  }
+
+  /** Shares the note text into that notes app (the app shows it to save) and remembers the choice. */
+  override fun saveToNotesApp(packageName: String, text: String, promise: Promise) {
+    val title = text.lineSequence().first().take(40)
+    val i = Intent(Intent.ACTION_SEND).setType("text/plain").setPackage(packageName)
+      .putExtra(Intent.EXTRA_TEXT, text)
+      .putExtra(Intent.EXTRA_SUBJECT, title)
+      .putExtra(Intent.EXTRA_TITLE, title)
+    val ok = launch(i)
+    if (ok) ctx.getSharedPreferences(NOTES_PREFS, Context.MODE_PRIVATE).edit().putString(KEY_NOTES_APP, packageName).apply()
+    promise.resolve(ok)
+  }
+
+  private fun looksLikeNotesApp(pkg: String, label: String): Boolean {
+    if (pkg in KNOWN_NOTES_APPS) return true
+    val l = label.lowercase()
+    return Regex("""\b(notes?|notepad|memo|keep)\b""").containsMatchIn(l) || pkg.endsWith(".note") || pkg.endsWith(".notes")
   }
 
   // ------------------------------------------------------------ location (SOS only)

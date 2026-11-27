@@ -8,6 +8,8 @@ export type Intent =
   | 'list_reminders'
   | 'update_reminder'
   | 'delete_reminder'
+  | 'set_alarm'
+  | 'set_timer'
   | 'create_note'
   | 'search_notes'
   | 'read_text'
@@ -15,6 +17,11 @@ export type Intent =
   | 'prepare_sms'
   | 'emergency_help'
   | 'open_application'
+  | 'play_media'
+  | 'search_app'
+  | 'media_control'
+  | 'get_directions'
+  | 'flashlight'
   | 'navigate'
   | 'remember_fact'
   | 'daily_summary'
@@ -35,6 +42,12 @@ export type IntentParameters = {
   query?: string;
   contact_name?: string;
   message?: string;
+  channel?: 'sms' | 'whatsapp';
+  /** Timer length. */
+  duration_seconds?: number;
+  control?: 'play' | 'pause' | 'next' | 'previous' | 'stop' | 'volume_up' | 'volume_down' | 'mute' | 'unmute' | 'volume_max';
+  /** Flashlight. */
+  state?: 'on' | 'off';
   app_name?: string;
   screen?: ScreenName;
   fact?: string;

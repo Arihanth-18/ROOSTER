@@ -3,6 +3,8 @@ import { transliterateToLatin } from '../src/utils/transliterate';
 import { nextOccurrence, occursOn, toLocalDateTime, parseLocalDateTime } from '../src/utils/dates';
 import { splitForSpeech } from '../src/utils/textChunks';
 import { parseOffline } from '../src/services/offlineParser';
+import { toWhatsAppNumber } from '../src/utils/phone';
+import { findAppTarget, pickPlayer } from '../src/utils/mediaApps';
 
 const contacts: MatchableContact[] = [
   { id: '1', name: 'Ramesh Kumar', phone: '+91 98450 11111' },
@@ -134,6 +136,132 @@ describe('offline parser', () => {
 
   it('returns null for open-ended questions', () => {
     expect(parseOffline('what is the capital of France')).toBeNull();
+  });
+
+  it('recognises WhatsApp messages', () => {
+    const cases: Array<[string, string, string | undefined]> = [
+      ['WhatsApp Ravi saying I will be late', 'Ravi', 'I will be late'],
+      ['send a WhatsApp message to Ramesh saying call me', 'Ramesh', 'call me'],
+      ['send a whatsapp to Suresh', 'Suresh', undefined],
+      ['message Ravi on WhatsApp saying hello', 'Ravi', 'hello'],
+      ['रवि को व्हाट्सएप पर मैसेज भेजो', 'रवि', undefined],
+      ['ರವಿ ಗೆ ವಾಟ್ಸಾಪ್ ಮೆಸೇಜ್ ಕಳುಹಿಸು', 'ರವಿ', undefined],
+    ];
+    for (const [input, name, message] of cases) {
+      const r = parseOffline(input);
+      expect([input, r?.intent, r?.parameters.channel, r?.parameters.contact_name, r?.parameters.message])
+        .toEqual([input, 'prepare_sms', 'whatsapp', name, message]);
+    }
+    expect(parseOffline('message Ravi saying hi')?.parameters.channel).toBeUndefined();
+    expect(parseOffline('open WhatsApp')?.intent).toBe('open_application');
+  });
+});
+
+describe('clock and notes commands', () => {
+  const now = new Date(2026, 10, 27, 10, 0);
+
+  it('sets alarms in the clock, separately from reminders', () => {
+    const a = parseOffline('set an alarm for 6 am', now)!;
+    expect(a.intent).toBe('set_alarm');
+    expect(a.parameters.datetime).toBe('2026-11-28T06:00');
+    expect(parseOffline('wake me up at 5:30 am every day', now)?.parameters).toMatchObject({
+      datetime: '2026-11-28T05:30',
+      recurrence: 'daily',
+    });
+    expect(parseOffline('सुबह 7 बजे का अलार्म लगाओ', now)?.intent).toBe('set_alarm');
+    expect(parseOffline('set an alarm', now)?.missing_information).toContain('time');
+    expect(parseOffline('remind me to take medicine at 8 pm', now)?.intent).toBe('create_reminder');
+  });
+
+  it('understands timer lengths', () => {
+    expect(parseOffline('set a timer for 10 minutes')?.parameters.duration_seconds).toBe(600);
+    expect(parseOffline('timer for 1 hour 30 minutes')?.parameters.duration_seconds).toBe(5400);
+    expect(parseOffline('start a timer for half an hour')?.parameters.duration_seconds).toBe(1800);
+    expect(parseOffline('5 मिनट का टाइमर लगाओ')?.parameters.duration_seconds).toBe(300);
+    expect(parseOffline('10 ನಿಮಿಷ ಟೈಮರ್ ಇಡು')?.parameters.duration_seconds).toBe(600);
+    expect(parseOffline('set a timer')?.missing_information).toContain('duration');
+  });
+
+  it('takes notes', () => {
+    expect(parseOffline('take a note buy milk and bread')?.parameters).toEqual({ note_text: 'buy milk and bread' });
+    expect(parseOffline('note down that the plumber comes on Monday')?.parameters.note_text).toBe('the plumber comes on Monday');
+    expect(parseOffline('make a note: call the bank')?.parameters.note_text).toBe('call the bank');
+    expect(parseOffline('दूध लाना है नोट करो')?.parameters.note_text).toBe('दूध लाना है');
+    expect(parseOffline('take a note')?.missing_information).toContain('note_text');
+    expect(parseOffline('open notes')?.intent).not.toBe('create_note');
+  });
+});
+
+describe('media, search, directions and torch', () => {
+  const p = (s: string) => parseOffline(s);
+
+  it('plays in the named app, or leaves the app to ROOSTER', () => {
+    expect(p('play Arijit Singh songs')?.parameters).toEqual({ query: 'Arijit Singh songs' });
+    expect(p('play cooking videos on YouTube')?.parameters).toEqual({ query: 'cooking videos', app_name: 'YouTube' });
+    expect(p('play bhajans on YouTube Music')?.parameters).toEqual({ query: 'bhajans', app_name: 'YouTube Music' });
+    expect(p('play some old Kishore Kumar songs on spotify')?.parameters).toEqual({ query: 'old Kishore Kumar songs', app_name: 'Spotify' });
+    expect(p('यूट्यूब पर भजन चलाओ')?.parameters).toEqual({ query: 'भजन', app_name: 'YouTube' });
+    expect(p('ಯೂಟ್ಯೂಬ್‌ನಲ್ಲಿ ಭಜನೆ ಪ್ಲೇ ಮಾಡಿ')?.parameters).toEqual({ query: 'ಭಜನೆ', app_name: 'YouTube' });
+    expect(p('play songs from the 90s')?.parameters).toEqual({ query: 'songs from the 90s' });
+  });
+
+  it('controls whatever is playing', () => {
+    expect(p('pause')?.parameters.control).toBe('pause');
+    expect(p('stop the music')?.parameters.control).toBe('pause');
+    expect(p('next song')?.parameters.control).toBe('next');
+    expect(p('play again')?.parameters.control).toBe('play');
+    expect(p('volume up')?.parameters.control).toBe('volume_up');
+    expect(p('आवाज़ कम करो')?.parameters.control).toBe('volume_down');
+    expect(p('ಮುಂದಿನ ಹಾಡು')?.parameters.control).toBe('next');
+    expect(p('stop')?.intent).toBe('stop_speaking');
+    expect(p('say that again')?.intent).toBe('repeat_last_response');
+  });
+
+  it('searches Google or a named app', () => {
+    expect(p('google best hospitals near me')?.parameters).toEqual({ query: 'best hospitals near me' });
+    expect(p('search youtube for yoga for beginners')?.parameters).toEqual({ query: 'yoga for beginners', app_name: 'YouTube' });
+    expect(p('search for walking shoes on Amazon')?.parameters).toEqual({ query: 'walking shoes', app_name: 'Amazon' });
+    expect(p('मौसम गूगल पर सर्च करो')?.parameters).toEqual({ query: 'मौसम', app_name: 'Google' });
+  });
+
+  it('opens directions and the torch', () => {
+    expect(p('directions to Lalbagh')?.parameters).toEqual({ query: 'Lalbagh' });
+    expect(p('take me to the nearest hospital')?.intent).toBe('get_directions');
+    expect(p('navigate to settings')?.intent).not.toBe('get_directions');
+    expect(p('turn on the torch')?.parameters).toEqual({ state: 'on' });
+    expect(p('टॉर्च बंद करो')?.parameters).toEqual({ state: 'off' });
+  });
+
+  it('still routes alarms, calls and app opening correctly', () => {
+    expect(p('सुबह 7 बजे का अलार्म लगाओ')?.intent).toBe('set_alarm');
+    expect(p('रमेश को फोन करो')?.intent).toBe('call_contact');
+    expect(p('open YouTube')?.intent).toBe('open_application');
+  });
+});
+
+describe('media app choice', () => {
+  const yt = 'com.google.android.youtube';
+  const ytm = 'com.google.android.apps.youtube.music';
+  it('finds the app the user named, preferring the longer name', () => {
+    expect(findAppTarget('YouTube Music')?.key).toBe('youtube_music');
+    expect(findAppTarget('youtube')?.key).toBe('youtube');
+    expect(findAppTarget('Hotstar')).toBeUndefined();
+  });
+  it('uses YouTube unless the phone does not have it', () => {
+    expect(pickPlayer(new Set([yt, ytm]))?.key).toBe('youtube');
+    expect(pickPlayer(new Set([ytm]))?.key).toBe('youtube_music');
+    expect(pickPlayer(new Set())).toBeUndefined();
+  });
+});
+
+describe('toWhatsAppNumber', () => {
+  it('adds the Indian country code to local numbers', () => {
+    expect(toWhatsAppNumber('98450 11111')).toBe('919845011111');
+    expect(toWhatsAppNumber('098450 11111')).toBe('919845011111');
+    expect(toWhatsAppNumber('+91 98450 11111')).toBe('919845011111');
+    expect(toWhatsAppNumber('+1 (415) 555-0100')).toBe('14155550100');
+    expect(toWhatsAppNumber('0091 98450 11111')).toBe('919845011111');
+    expect(toWhatsAppNumber('')).toBeNull();
   });
 });
 

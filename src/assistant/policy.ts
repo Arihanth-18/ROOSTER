@@ -4,9 +4,9 @@ import type { Intent } from '../types';
 /** Always confirmed, at every confirmation level. */
 const ALWAYS: Intent[] = ['call_contact', 'prepare_sms', 'emergency_help', 'delete_reminder'];
 /** Confirmed at "standard" and "high". */
-const STANDARD: Intent[] = ['create_reminder', 'update_reminder', 'open_application', 'remember_fact'];
+const STANDARD: Intent[] = ['create_reminder', 'update_reminder', 'set_alarm', 'set_timer', 'open_application', 'remember_fact'];
 /** Confirmed only at "high". */
-const HIGH: Intent[] = ['create_note', 'navigate', 'read_notifications', 'read_text'];
+const HIGH: Intent[] = ['create_note', 'navigate', 'read_notifications', 'read_text', 'play_media', 'search_app', 'get_directions'];
 
 /**
  * Whether an action needs an explicit yes. Low-confidence interpretations of any action

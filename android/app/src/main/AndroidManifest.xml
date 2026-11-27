@@ -9,6 +9,8 @@
     <!-- Place the call / send the SMS directly after the user says "yes" (falls back to dialer / SMS app if refused). -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- Set alarms and timers in the phone's own Clock app (normal permission, no prompt). -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Reminders. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -50,6 +52,28 @@
         <intent>
             <action android:name="android.intent.action.SENDTO" />
             <data android:scheme="smsto" />
+        </intent>
+        <!-- Find the phone's notes apps (OnePlus Notes, Keep, Samsung Notes...) to save notes there. -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_TIMER" />
+        </intent>
+        <!-- Play music/videos by voice in YouTube, YouTube Music, Spotify... and search the web. -->
+        <intent>
+            <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.WEB_SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
         </intent>
     </queries>
 
