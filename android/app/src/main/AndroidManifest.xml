@@ -2,6 +2,13 @@
 
     <!-- Assistant backend (AI understanding only). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Phone settings by voice. Reading Wi-Fi/network state needs no prompt. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Silent / vibrate / Do Not Disturb: only works after the user allows "Do Not Disturb access". -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Brightness and auto-rotate: only works after the user allows "Modify system settings". -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <!-- Voice commands. Requested when the user first taps the microphone. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Call / message people by name. Requested when the user first asks to contact someone. -->

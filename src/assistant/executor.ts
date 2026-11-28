@@ -2,7 +2,7 @@ import type { AppSettings } from '../accessibility/types';
 import type { AskOptions, AskResult } from '../components/DialogProvider';
 import type { TFunction, StringKey } from '../localization/i18n';
 import { navigate } from '../navigation/navigationRef';
-import { SPEECH_LOCALE, type ChatTurn, type IntentResult, type Reminder, type ScreenName } from '../types';
+import { SPEECH_LOCALE, type ChatTurn, type IntentResult, type PhoneSetting, type Reminder, type ScreenName } from '../types';
 import { factsRepo, notesRepo, remindersRepo, trustedRepo } from '../storage/repositories';
 import {
   getActiveNotifications,
@@ -17,9 +17,17 @@ import {
   isAccessibilityServiceEnabled,
   openAccessibilitySettings,
   mediaControl,
+  getDeviceStatus,
+  openSettingsPage,
   openUrl,
   openWhatsAppChat,
   readScreen,
+  setAutoRotate,
+  setBrightness,
+  setDoNotDisturb,
+  setRingerMode,
+  type DeviceStatus,
+  type SettingsPage,
   playFromSearch,
   setFlashlight,
   webSearch,
@@ -35,7 +43,7 @@ import { describeWhen, deleteReminder, ReminderInPastError, saveReminder, todays
 import { getLastSpoken, stopSpeaking } from '../services/speech';
 import { readMessages, respond } from '../services/assistantClient';
 import { fuzzyFind, matchContact, type MatchableContact } from '../utils/contactMatch';
-import { formatTime, parseLocalDateTime } from '../utils/dates';
+import { formatLongDate, formatTime, parseLocalDateTime } from '../utils/dates';
 import { needsConfirmation } from './policy';
 import { ensurePermission } from './permissions';
 import { callConfirmed, messageConfirmed } from './comms';
@@ -381,6 +389,12 @@ export async function execute(ctx: ExecContext, r: IntentResult, draft: Draft | 
     case 'read_screen':
       return readScreenAloud(ctx, r);
 
+    case 'device_setting':
+      return changePhoneSetting(ctx, r);
+
+    case 'device_status':
+      return phoneStatus(ctx, r);
+
     case 'unknown':
     default:
       return { say: r.natural_language_response || t('didnt_understand') };
@@ -459,6 +473,106 @@ async function searchApp(ctx: ExecContext, r: IntentResult): Promise<ExecResult>
   if (!(await confirm(ctx, r, t('confirm_search', { query, app: target.label })))) return { say: t('cancelled') };
   const ok = await openUrl(target.searchUrl(query), installed ? target.packageName : '');
   return { say: ok ? t('search_opened', { app: target.label, query }) : t('action_failed') };
+}
+
+// ---------------------------------------------------------------------------- phone settings & status
+
+/** Settings whose current on/off state ROOSTER can read, to avoid opening a page for nothing. */
+const STATUS_KEY: Partial<Record<PhoneSetting, keyof DeviceStatus>> = {
+  wifi: 'wifi', bluetooth: 'bluetooth', location: 'location', airplane_mode: 'airplane', battery_saver: 'batterySaver',
+};
+/** Settings with a quick panel (a pop-up with the switch) rather than a full settings page. */
+const HAS_PANEL = new Set<PhoneSetting>(['wifi', 'mobile_data', 'nfc']);
+
+/**
+ * Brightness, auto-rotate, silent/vibrate and Do Not Disturb change directly (after a one-time
+ * permission). Everything else Android reserves for the user: ROOSTER opens the switch for them.
+ */
+async function changePhoneSetting(ctx: ExecContext, r: IntentResult): Promise<ExecResult> {
+  const { t } = ctx;
+  const setting = r.parameters.setting ?? 'settings';
+  const state = r.parameters.state;
+  const name = t(`setting_${setting}` as StringKey);
+  const onOff = state === 'on' || state === 'off' ? state : undefined;
+
+  switch (setting) {
+    case 'brightness': {
+      if (state !== 'up' && state !== 'down' && state !== 'max' && state !== 'min' && state !== 'auto') break;
+      const level = await setBrightness(state);
+      if (level < 0) {
+        await openSettingsPage('write_settings');
+        return { say: t('needs_write_settings') };
+      }
+      return { say: state === 'auto' ? t('brightness_auto') : t('brightness_set', { level }) };
+    }
+    case 'auto_rotate': {
+      if (!onOff) break;
+      const res = await setAutoRotate(onOff === 'on');
+      if (res === 'no_permission') {
+        await openSettingsPage('write_settings');
+        return { say: t('needs_write_settings') };
+      }
+      return { say: res === 'ok' ? t(onOff === 'on' ? 'rotate_on' : 'rotate_off') : t('action_failed') };
+    }
+    case 'ringer': {
+      const mode = state === 'silent' || state === 'vibrate' ? state : 'normal';
+      const res = await setRingerMode(mode);
+      if (res === 'no_permission') {
+        await openSettingsPage('dnd_access');
+        return { say: t('needs_dnd_access') };
+      }
+      return { say: res === 'ok' ? t(`ringer_${mode}` as StringKey) : t('action_failed') };
+    }
+    case 'do_not_disturb': {
+      if (!onOff) break;
+      const res = await setDoNotDisturb(onOff === 'on');
+      if (res === 'no_permission') {
+        await openSettingsPage('dnd_access');
+        return { say: t('needs_dnd_access') };
+      }
+      return { say: t(onOff === 'on' ? 'dnd_on' : 'dnd_off') };
+    }
+    default: {
+      const key = STATUS_KEY[setting];
+      if (key && onOff) {
+        const now = await getDeviceStatus().catch(() => null);
+        if (now && now[key] === (onOff === 'on')) return { say: t('setting_already', { name, state: t(`state_${onOff}`) }) };
+      }
+    }
+  }
+  // Android doesn't let apps flip this one: open the panel or page with the switch.
+  const page: SettingsPage = setting === 'brightness' || setting === 'auto_rotate' ? 'display' : setting;
+  if (!(await openSettingsPage(page))) return { say: t('action_failed') };
+  if (!onOff) return { say: t('settings_page_opened', { name }) };
+  return { say: t(HAS_PANEL.has(setting) ? 'setting_panel_tap' : 'setting_page_tap', { name, state: t(`state_${onOff}`) }) };
+}
+
+/** Battery, connection, on/off state of a setting, time and date — all answered on the phone. */
+async function phoneStatus(ctx: ExecContext, r: IntentResult): Promise<ExecResult> {
+  const { t, settings } = ctx;
+  const what = r.parameters.status_of ?? 'all';
+  const lang = settings.language;
+  if (what === 'time') return { say: t('status_time', { time: formatTime(new Date(), lang) }) };
+  if (what === 'date') return { say: t('status_date', { date: formatLongDate(new Date(), lang) }) };
+  const st = await getDeviceStatus().catch(() => null);
+  if (!st) return { say: t('action_failed') };
+  const onOff = (v: boolean) => t(v ? 'state_on' : 'state_off');
+  const battery = t(st.charging ? 'status_battery_charging' : 'status_battery', { level: st.battery });
+  const network = st.online
+    ? t('status_online', { via: t(st.network === 'wifi' ? 'setting_wifi' : 'setting_mobile_data') })
+    : t('status_offline');
+  const line = (s: PhoneSetting, v: boolean) => t('status_onoff', { name: t(`setting_${s}` as StringKey), state: onOff(v) });
+  switch (what) {
+    case 'battery': return { say: battery };
+    case 'network': return { say: network };
+    case 'wifi': return { say: `${line('wifi', st.wifi)} ${network}` };
+    case 'bluetooth': return { say: line('bluetooth', st.bluetooth) };
+    case 'location': return { say: line('location', st.location) };
+    case 'airplane_mode': return { say: line('airplane_mode', st.airplane) };
+    case 'ringer': return { say: t(`ringer_${st.ringer}` as StringKey) };
+    case 'brightness': return { say: t('status_brightness', { level: st.brightness }) };
+    default: return { say: `${battery} ${network} ${line('bluetooth', st.bluetooth)}` };
+  }
 }
 
 // ---------------------------------------------------------------------------- reading messages on screen

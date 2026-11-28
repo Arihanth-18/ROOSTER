@@ -134,6 +134,40 @@ export async function fillFormOnScreen(): Promise<FillResult> {
   return JSON.parse(await NativeDevice.fillFormOnScreen()) as FillResult;
 }
 
+// ---------------------------------------------------------------------------- phone settings
+
+export type DeviceStatus = {
+  battery: number;
+  charging: boolean;
+  network: 'wifi' | 'mobile' | 'other' | 'none';
+  online: boolean;
+  wifi: boolean;
+  bluetooth: boolean;
+  airplane: boolean;
+  location: boolean;
+  batterySaver: boolean;
+  ringer: 'normal' | 'vibrate' | 'silent';
+  dnd: boolean;
+  brightness: number;
+  autoRotate: boolean;
+};
+
+export async function getDeviceStatus(): Promise<DeviceStatus> {
+  return JSON.parse(await NativeDevice.getDeviceStatus()) as DeviceStatus;
+}
+
+export type SettingsPage =
+  | 'wifi' | 'mobile_data' | 'internet' | 'nfc' | 'bluetooth' | 'airplane_mode' | 'location' | 'hotspot'
+  | 'battery_saver' | 'dark_mode' | 'display' | 'sound' | 'do_not_disturb' | 'dnd_access' | 'write_settings'
+  | 'date' | 'language' | 'storage' | 'apps' | 'accessibility' | 'settings';
+
+export const openSettingsPage = (page: SettingsPage) => NativeDevice.openSettingsPage(page);
+export const setBrightness = (action: 'up' | 'down' | 'max' | 'min' | 'auto') => NativeDevice.setBrightness(action);
+export const setAutoRotate = (on: boolean) => NativeDevice.setAutoRotate(on) as Promise<'ok' | 'no_permission' | 'failed'>;
+export const setRingerMode = (mode: 'normal' | 'vibrate' | 'silent') =>
+  NativeDevice.setRingerMode(mode) as Promise<'ok' | 'no_permission' | 'failed'>;
+export const setDoNotDisturb = (on: boolean) => NativeDevice.setDoNotDisturb(on) as Promise<'ok' | 'no_permission'>;
+
 // ---------------------------------------------------------------------------- reading the screen
 
 export type ScreenText = { error: 'not_enabled' | 'no_window' | 'rooster_in_front' | 'home_screen' | 'failed' } | { app: string; lines: string[] };

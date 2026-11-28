@@ -39,7 +39,19 @@ type AssistantApi = {
 const Ctx = createContext<AssistantApi | null>(null);
 
 /** Intents handled instantly on-device, without a network round trip. */
-const LOCAL_FIRST = new Set(['stop_speaking', 'repeat_last_response', 'emergency_help']);
+/**
+ * Handled on the phone straight away, without the AI: instant, and they work with no internet.
+ * (Phone settings, status, torch and playback controls are simple, predictable commands.)
+ */
+const LOCAL_FIRST = new Set([
+  'stop_speaking',
+  'repeat_last_response',
+  'emergency_help',
+  'device_setting',
+  'device_status',
+  'flashlight',
+  'media_control',
+]);
 
 export function AssistantProvider({ children }: { children: React.ReactNode }) {
   const { settings, prefs, t, haptic } = useApp();

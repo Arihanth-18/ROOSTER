@@ -25,6 +25,8 @@ export const INTENTS = [
   'flashlight',
   'fill_form',
   'read_screen',
+  'device_setting',
+  'device_status',
   'navigate',
   'remember_fact',
   'daily_summary',
@@ -90,7 +92,20 @@ export const ParametersSchema = z
     target_language: z.enum(LANGUAGES).optional(),
     duration_seconds: z.coerce.number().int().min(1).max(86400).optional(),
     control: z.enum(['play', 'pause', 'next', 'previous', 'stop', 'volume_up', 'volume_down', 'mute', 'unmute', 'volume_max']).optional(),
-    state: z.enum(['on', 'off']).optional(),
+    /** on/off for switches and the torch; up/down/max/min/auto for brightness; silent/vibrate/normal for the ringer. */
+    state: z.enum(['on', 'off', 'up', 'down', 'max', 'min', 'auto', 'silent', 'vibrate', 'normal']).optional(),
+    /** device_setting: which phone setting to change or open. */
+    setting: z
+      .enum([
+        'wifi', 'mobile_data', 'bluetooth', 'airplane_mode', 'location', 'hotspot', 'nfc', 'do_not_disturb', 'ringer',
+        'brightness', 'auto_rotate', 'battery_saver', 'dark_mode', 'display', 'sound', 'date', 'language', 'storage',
+        'apps', 'accessibility', 'settings',
+      ])
+      .optional(),
+    /** device_status: what the user asks about. */
+    status_of: z
+      .enum(['battery', 'network', 'wifi', 'bluetooth', 'location', 'airplane_mode', 'ringer', 'brightness', 'time', 'date', 'all'])
+      .optional(),
     app_name: shortText(100).optional(),
     screen: z.enum(SCREENS).optional(),
     fact: shortText(300).optional(),

@@ -379,6 +379,42 @@ class RoosterDeviceModule(private val ctx: ReactApplicationContext) : NativeRoos
     }
   }
 
+  // ------------------------------------------------------------ phone settings (see DeviceSettings)
+
+  override fun getDeviceStatus(promise: Promise) {
+    try { promise.resolve(DeviceSettings.status(ctx).toString()) } catch (e: Exception) {
+      promise.reject("status_failed", e.message ?: "Could not read phone status", e)
+    }
+  }
+
+  /** Opens the quick panel or settings page for `page` so the user can flip the switch. */
+  override fun openSettingsPage(page: String, promise: Promise) {
+    val i = DeviceSettings.intentFor(ctx, page)
+    promise.resolve(launch(i) || launch(DeviceSettings.fallbackFor(page)))
+  }
+
+  /** New brightness in percent, or -1 when "Modify system settings" isn't allowed yet. */
+  override fun setBrightness(action: String, promise: Promise) {
+    promise.resolve(DeviceSettings.setBrightness(ctx, action).toDouble())
+  }
+
+  /** "ok" | "no_permission" | "failed" */
+  override fun setAutoRotate(on: Boolean, promise: Promise) {
+    promise.resolve(
+      if (!DeviceSettings.canWriteSettings(ctx)) "no_permission" else if (DeviceSettings.setAutoRotate(ctx, on)) "ok" else "failed",
+    )
+  }
+
+  /** "ok" | "no_permission" | "failed" */
+  override fun setRingerMode(mode: String, promise: Promise) {
+    promise.resolve(DeviceSettings.setRinger(ctx, mode))
+  }
+
+  /** "ok" | "no_permission" */
+  override fun setDoNotDisturb(on: Boolean, promise: Promise) {
+    promise.resolve(DeviceSettings.setDnd(ctx, on))
+  }
+
   // ------------------------------------------------------------ keyboards (Wispr Flow)
 
   /** JSON { installed, enabled, current } for a keyboard app such as Wispr Flow. */

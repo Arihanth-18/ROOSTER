@@ -277,6 +277,56 @@ describe('reading messages on screen', () => {
   });
 });
 
+describe('phone settings and status (work offline)', () => {
+  const p = (s: string) => parseOffline(s);
+
+  it('switches settings on and off in three languages', () => {
+    expect(p('turn off wifi')?.parameters).toEqual({ setting: 'wifi', state: 'off' });
+    expect(p('switch on mobile data')?.parameters).toEqual({ setting: 'mobile_data', state: 'on' });
+    expect(p('turn on bluetooth')?.parameters).toEqual({ setting: 'bluetooth', state: 'on' });
+    expect(p('enable airplane mode')?.parameters).toEqual({ setting: 'airplane_mode', state: 'on' });
+    expect(p('turn off location')?.parameters).toEqual({ setting: 'location', state: 'off' });
+    expect(p('turn on hotspot')?.parameters).toEqual({ setting: 'hotspot', state: 'on' });
+    expect(p('turn on battery saver')?.parameters).toEqual({ setting: 'battery_saver', state: 'on' });
+    expect(p('turn on do not disturb')?.parameters).toEqual({ setting: 'do_not_disturb', state: 'on' });
+    expect(p('वाईफाई बंद करो')?.parameters).toEqual({ setting: 'wifi', state: 'off' });
+    expect(p('ब्लूटूथ चालू करो')?.parameters).toEqual({ setting: 'bluetooth', state: 'on' });
+    expect(p('ಮೊಬೈಲ್ ಡೇಟಾ ಆಫ್ ಮಾಡು')?.parameters).toEqual({ setting: 'mobile_data', state: 'off' });
+  });
+
+  it('handles brightness, ringer and settings pages', () => {
+    expect(p('brightness up')?.parameters).toEqual({ setting: 'brightness', state: 'up' });
+    expect(p('full brightness')?.parameters).toEqual({ setting: 'brightness', state: 'max' });
+    expect(p('ब्राइटनेस कम करो')?.parameters).toEqual({ setting: 'brightness', state: 'down' });
+    expect(p('put the phone on silent')?.parameters).toEqual({ setting: 'ringer', state: 'silent' });
+    expect(p('vibrate mode')?.parameters).toEqual({ setting: 'ringer', state: 'vibrate' });
+    expect(p('turn off silent mode')?.parameters).toEqual({ setting: 'ringer', state: 'normal' });
+    expect(p('फ़ोन साइलेंट करो')?.parameters).toEqual({ setting: 'ringer', state: 'silent' });
+    expect(p('open bluetooth settings')?.parameters).toEqual({ setting: 'bluetooth' });
+    expect(p('turn off auto rotate')?.parameters).toEqual({ setting: 'auto_rotate', state: 'off' });
+  });
+
+  it('answers status questions', () => {
+    expect(p('how much battery is left')?.parameters).toEqual({ status_of: 'battery' });
+    expect(p('बैटरी कितनी है')?.parameters).toEqual({ status_of: 'battery' });
+    expect(p('ಬ್ಯಾಟರಿ ಎಷ್ಟಿದೆ')?.parameters).toEqual({ status_of: 'battery' });
+    expect(p('is wifi on')?.parameters).toEqual({ status_of: 'wifi' });
+    expect(p('am I connected to the internet')?.parameters).toEqual({ status_of: 'network' });
+    expect(p('what time is it')?.parameters).toEqual({ status_of: 'time' });
+    expect(p('कितने बजे हैं')?.parameters).toEqual({ status_of: 'time' });
+    expect(p("what's the date today")?.parameters).toEqual({ status_of: 'date' });
+  });
+
+  it('does not steal other commands', () => {
+    expect(p('remind me to turn off the wifi at 10 pm')?.intent).toBe('create_reminder');
+    expect(p('search the internet for how to switch off a geyser')?.intent).toBe('search_app');
+    expect(p('turn on the torch')?.intent).toBe('flashlight');
+    expect(p('volume up')?.intent).toBe('media_control');
+    expect(p('open settings')?.intent).toBe('navigate');
+    expect(p('take a note wifi password is on the router')?.intent).toBe('create_note');
+  });
+});
+
 describe('media app choice', () => {
   const yt = 'com.google.android.youtube';
   const ytm = 'com.google.android.apps.youtube.music';

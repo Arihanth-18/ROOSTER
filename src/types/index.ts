@@ -24,6 +24,8 @@ export type Intent =
   | 'flashlight'
   | 'fill_form'
   | 'read_screen'
+  | 'device_setting'
+  | 'device_status'
   | 'navigate'
   | 'remember_fact'
   | 'daily_summary'
@@ -33,6 +35,11 @@ export type Intent =
   | 'unknown';
 
 export type ScreenName = 'home' | 'conversation' | 'reminders' | 'reader' | 'emergency' | 'settings' | 'accessibility';
+
+export type PhoneSetting =
+  | 'wifi' | 'mobile_data' | 'bluetooth' | 'airplane_mode' | 'location' | 'hotspot' | 'nfc' | 'do_not_disturb' | 'ringer'
+  | 'brightness' | 'auto_rotate' | 'battery_saver' | 'dark_mode' | 'display' | 'sound' | 'date' | 'language' | 'storage'
+  | 'apps' | 'accessibility' | 'settings';
 
 export type IntentParameters = {
   title?: string;
@@ -51,7 +58,11 @@ export type IntentParameters = {
   duration_seconds?: number;
   control?: 'play' | 'pause' | 'next' | 'previous' | 'stop' | 'volume_up' | 'volume_down' | 'mute' | 'unmute' | 'volume_max';
   /** Flashlight. */
-  state?: 'on' | 'off';
+  state?: 'on' | 'off' | 'up' | 'down' | 'max' | 'min' | 'auto' | 'silent' | 'vibrate' | 'normal';
+  /** device_setting: which phone setting to change or open. */
+  setting?: PhoneSetting;
+  /** device_status: what the user asks about. */
+  status_of?: 'battery' | 'network' | 'wifi' | 'bluetooth' | 'location' | 'airplane_mode' | 'ringer' | 'brightness' | 'time' | 'date' | 'all';
   app_name?: string;
   screen?: ScreenName;
   fact?: string;

@@ -1,4 +1,4 @@
-import type { IntentParameters, IntentResult, Intent, ScreenName } from '../types';
+import type { IntentParameters, IntentResult, Intent, PhoneSetting, ScreenName } from '../types';
 import { toLocalDateTime } from '../utils/dates';
 import { extractApp, findAppTarget } from '../utils/mediaApps';
 
@@ -244,6 +244,77 @@ function parseMedia(text: string): IntentResult | null {
 const FILL_FORM =
   /\b(?:fill|complete)\s+(?:in\s+|out\s+|up\s+)?(?:this|the|my)?\s*(?:form|details)\b|\bfill (?:it|this) (?:in|up)\b|\bautofill\b|(?:फॉर्म|फ़ॉर्म|फार्म)\s*(?:भरो|भर दो|भरें)|(?:ಫಾರ್ಮ್|ಅರ್ಜಿ)\s*(?:ತುಂಬು|ತುಂಬಿ|ಭರ್ತಿ)/i;
 
+// ---------------------------------------------------------------------------- phone settings & status
+
+const SETTING_WORDS: Array<[RegExp, PhoneSetting]> = [
+  [/\bphone settings\b|फ़ोन की सेटिंग|फोन की सेटिंग|ಫೋನ್ ಸೆಟ್ಟಿಂಗ್/i, 'settings'],
+  [/\b(?:airplane|aeroplane|flight)\s*mode\b|फ़्लाइट\s*मोड|फ्लाइट\s*मोड|एयरप्लेन\s*मोड|ಫ್ಲೈಟ್\s*ಮೋಡ್|ಏರೋಪ್ಲೇನ್\s*ಮೋಡ್/i, 'airplane_mode'],
+  [/\b(?:battery saver|power sav\w*|power saver)\b|बैटरी\s*सेवर|ಬ್ಯಾಟರಿ\s*ಸೇವರ್/i, 'battery_saver'],
+  [/\b(?:do not disturb|dnd)\b|डू नॉट डिस्टर्ब|ಡು ನಾಟ್ ಡಿಸ್ಟರ್ಬ್/i, 'do_not_disturb'],
+  [/\b(?:wi-?fi|wireless)\b|वाई-?फ़ाई|वाई-?फाई|वाईफाई|ವೈ-?ಫೈ/i, 'wifi'],
+  [/\b(?:mobile data|cellular data|data connection|internet)\b|मोबाइल\s*डेटा|इंटरनेट|ಮೊಬೈಲ್\s*ಡೇಟಾ|ಇಂಟರ್ನೆಟ್/i, 'mobile_data'],
+  [/\bbluetooth\b|ब्लूटूथ|ಬ್ಲೂಟೂತ್/i, 'bluetooth'],
+  [/\b(?:location|gps)\b|लोकेशन|जीपीएस|ಲೊಕೇಶನ್|ಜಿಪಿಎಸ್/i, 'location'],
+  [/\b(?:hotspot|tethering)\b|हॉटस्पॉट|ಹಾಟ್\S*\s*ಸ್ಪಾಟ್|ಹಾಟ್‌ಸ್ಪಾಟ್/i, 'hotspot'],
+  [/\bnfc\b/i, 'nfc'],
+  [/\b(?:silent|vibrat\w*|ringer|ring mode|sound mode|general mode)\b|साइलेंट|वाइब्रेट|ಸೈಲೆಂಟ್|ವೈಬ್ರೇಟ್/i, 'ringer'],
+  [/\b(?:brightness|brighter|dimmer|screen light)\b|ब्राइटनेस|स्क्रीन की रोशनी|ಬ್ರೈಟ್\S*ನೆಸ್|ಪರದೆಯ ಬೆಳಕು/i, 'brightness'],
+  [/\b(?:auto[- ]?rotat\w*|screen rotation)\b|ऑटो\s*रोटेट|ಆಟೋ\s*ರೊಟೇಟ್/i, 'auto_rotate'],
+  [/\b(?:dark mode|dark theme|night mode)\b|डार्क\s*मोड|ಡಾರ್ಕ್\s*ಮೋಡ್/i, 'dark_mode'],
+];
+const S_OFF = /\b(?:off|disable|deactivate|disconnect)\b|बंद|ऑफ़|ऑफ|बुझा|ಆಫ್|ಆರಿಸು|ಆರಿಸಿ|ನಿಲ್ಲಿಸು|ನಿಲ್ಲಿಸಿ/i;
+const S_ON = /\b(?:on|enable|activate|connect)\b|चालू|ऑन|ಆನ್|ಹಚ್ಚು|ಹಚ್ಚಿ/i;
+const S_MAX = /\b(?:max(?:imum)?|full|highest)\b|पूरी|फुल|ಪೂರ್ಣ|ಫುಲ್/i;
+const S_MIN = /\b(?:min(?:imum)?|lowest)\b|सबसे कम|ಕನಿಷ್ಠ/i;
+const S_AUTO = /\b(?:auto(?:matic)?|adaptive)\b|ऑटो|अपने आप|ಆಟೋ|ಸ್ವಯಂ/i;
+const S_UP = /\b(?:up|increase|raise|higher|brighter|more)\b|बढ़ा|ज़्यादा|ज्यादा|तेज़|तेज|ಹೆಚ್ಚಿಸು|ಹೆಚ್ಚಿಸಿ|ಜಾಸ್ತಿ/i;
+const S_DOWN = /\b(?:down|decrease|reduce|lower|dimmer|dim|less)\b|कम|घटा|ಕಡಿಮೆ|ಇಳಿಸು|ಇಳಿಸಿ/i;
+const OPEN_SETTINGS = /\b(?:open|show|go to)\b.*\bsettings?\b|सेटिंग\S*\s*(?:खोलो|दिखाओ)|ಸೆಟ್ಟಿಂಗ್\S*\s*(?:ತೆರೆ|ತೆರೆಯಿರಿ)/i;
+const NOT_A_SETTING = /^(?:please\s+)?(?:search|google|look up|find|play|send|message|call|whatsapp)\b/i;
+
+const QUESTION = /^(?:is|are|am|was|what|what's|whats|how|check|tell me)\b|\?\s*$|क्या|कितन|ಎಷ್ಟ|ಇದೆಯೇ|ಏನು|ಆಗಿದೆಯೇ/i;
+const TIME_Q = /^(?:please\s+)?(?:what(?:'s| is)? the time|what time is it|tell me the time|time now|current time)\b|कितने बजे|टाइम क्या|समय क्या|ಎಷ್ಟು ಗಂಟೆ|ಸಮಯ ಎಷ್ಟು/i;
+const DATE_Q = /\b(?:what(?:'s| is)? (?:the )?date|today'?s date|what day is (?:it|today)|which day is (?:it|today))\b|आज (?:क्या )?(?:तारीख|दिन)|कौन सा दिन|ಇಂದು (?:ಯಾವ )?(?:ದಿನಾಂಕ|ದಿನ)|ದಿನಾಂಕ ಏನು/i;
+const BATTERY_Q = /\b(?:battery|charge|charging)\b|बैटरी|चार्ज|ಬ್ಯಾಟರಿ|ಚಾರ್ಜ್/i;
+const CONNECTED_Q = /\b(?:connected|online|network)\b|जुड़ा|नेटवर्क|ಸಂಪರ್ಕ|ನೆಟ್‌ವರ್ಕ್/i;
+
+/** "how much battery", "is wifi on", "what time is it", "बैटरी कितनी है", "ಎಷ್ಟು ಗಂಟೆ". */
+function parseDeviceStatus(text: string): IntentResult | null {
+  if (TIME_Q.test(text)) return result('device_status', { status_of: 'time' });
+  if (DATE_Q.test(text)) return result('device_status', { status_of: 'date' });
+  if (!QUESTION.test(text)) return null;
+  const setting = SETTING_WORDS.find(([re]) => re.test(text))?.[1];
+  if (BATTERY_Q.test(text) && setting !== 'battery_saver') return result('device_status', { status_of: 'battery' });
+  const map: Partial<Record<PhoneSetting, NonNullable<IntentParameters['status_of']>>> = {
+    wifi: 'wifi', mobile_data: 'network', bluetooth: 'bluetooth', location: 'location',
+    airplane_mode: 'airplane_mode', ringer: 'ringer', brightness: 'brightness',
+  };
+  if (setting && map[setting]) return result('device_status', { status_of: map[setting] });
+  if (CONNECTED_Q.test(text)) return result('device_status', { status_of: 'network' });
+  return null;
+}
+
+/** "turn off wifi", "brightness up", "put the phone on silent", "ब्लूटूथ चालू करो", "ವೈಫೈ ಆಫ್ ಮಾಡು". */
+function parseDeviceSetting(text: string): IntentResult | null {
+  if (NOT_A_SETTING.test(text)) return null;
+  const setting = SETTING_WORDS.find(([re]) => re.test(text))?.[1];
+  if (!setting) return null;
+  if (OPEN_SETTINGS.test(text)) return result('device_setting', { setting });
+  if (setting === 'ringer') {
+    const vibrate = /vibrat|वाइब्रेट|ವೈಬ್ರೇಟ್/i.test(text);
+    const silent = /\bsilent\b|साइलेंट|ಸೈಲೆಂಟ್/i.test(text);
+    const state = S_OFF.test(text) ? 'normal' : vibrate ? 'vibrate' : silent ? 'silent' : 'normal';
+    return result('device_setting', { setting, state });
+  }
+  if (setting === 'brightness') {
+    const state = S_MAX.test(text) ? 'max' : S_MIN.test(text) ? 'min' : S_AUTO.test(text) ? 'auto' : S_UP.test(text) ? 'up' : S_DOWN.test(text) ? 'down' : undefined;
+    return result('device_setting', state ? { setting, state } : { setting });
+  }
+  const state = S_OFF.test(text) ? 'off' : S_ON.test(text) ? 'on' : undefined;
+  if (!state && setting !== 'settings') return null; // just a word like "wifi": let the AI decide
+  return result('device_setting', state ? { setting, state } : { setting });
+}
+
 /** "Read this message", "translate this message to Kannada", "यह मैसेज पढ़ो", "ಈ ಸಂದೇಶ ಓದು". */
 const READ_SCREEN =
   /\b(?:read|what does)\s+(?:out\s+)?(?:this|the|that|my)?\s*(?:messages?|sms|chat|screen|whatsapp)\b|\btranslate\s+(?:this|the|that|my)?\s*(?:messages?|sms|chat|screen|text)?\b|(?:मैसेज|संदेश|एसएमएस|स्क्रीन)\s*(?:पढ़ो|पढ़कर सुनाओ|पढ़ कर सुनाओ|पढ़ें|सुनाओ)|(?:अनुवाद|ट्रांसलेट)\s*(?:करो|करें|कर दो)|(?:ಸಂದೇಶ|ಮೆಸೇಜ್|ಸ್ಕ್ರೀನ್)\s*(?:ಓದು|ಓದಿ|ಓದಿ ಹೇಳು)|ಅನುವಾದ\s*(?:ಮಾಡು|ಮಾಡಿ)|ಅನುವಾದಿಸು|ಅನುವಾದಿಸಿ/i;
@@ -318,6 +389,10 @@ export function parseOffline(input: string, now: Date = new Date()): IntentResul
   }
   if (REMIND.test(text)) return parseReminder(text, now);
   if (ALARM.test(text)) return parseAlarm(text, now);
+  const status = parseDeviceStatus(text);
+  if (status) return status;
+  const setting = parseDeviceSetting(text);
+  if (setting) return setting;
   const openAndDo = parseOpenAndDo(text);
   if (openAndDo) return openAndDo;
   const media = parseMedia(text);

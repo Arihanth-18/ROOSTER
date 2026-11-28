@@ -71,6 +71,8 @@ class RoosterSpeechModule(private val ctx: ReactApplicationContext) : NativeRoos
         // Older users often pause mid-sentence; ask the engine to wait longer (engines may ignore this).
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+        // No internet: use the phone's downloaded speech pack so voice commands still work offline.
+        if (!com.rooster.app.device.DeviceSettings.isOnline(ctx)) putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
       }
       try {
         r.startListening(intent)

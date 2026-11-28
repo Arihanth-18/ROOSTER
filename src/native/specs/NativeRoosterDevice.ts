@@ -60,6 +60,18 @@ export interface Spec extends TurboModule {
   fillFormOnScreen(): Promise<string>;
   /** Visible text of the app behind ROOSTER, for "read this message". JSON { app, lines } or { error }. */
   readScreen(): Promise<string>;
+  /** JSON { battery, charging, network, online, wifi, bluetooth, airplane, location, batterySaver, ringer, dnd, brightness, autoRotate }. */
+  getDeviceStatus(): Promise<string>;
+  /** Quick panel or settings page so the user can flip a switch apps may not change. */
+  openSettingsPage(page: string): Promise<boolean>;
+  /** up | down | max | min | auto. New brightness %, or -1 without "Modify system settings". */
+  setBrightness(action: string): Promise<number>;
+  /** "ok" | "no_permission" | "failed" */
+  setAutoRotate(on: boolean): Promise<string>;
+  /** normal | vibrate | silent → "ok" | "no_permission" | "failed" */
+  setRingerMode(mode: string): Promise<string>;
+  /** "ok" | "no_permission" */
+  setDoNotDisturb(on: boolean): Promise<string>;
   /** JSON { installed, enabled, current } for a keyboard app (Wispr Flow). */
   getKeyboardStatus(packageName: string): Promise<string>;
   openKeyboardSettings(): void;
