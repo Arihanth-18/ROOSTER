@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { postInterpret, postRespond } from '../controllers/assistantController.js';
+import { postInterpret, postReadMessages, postRespond } from '../controllers/assistantController.js';
 import { aiConfigured, env } from '../config/env.js';
 
 export const router = Router();
@@ -10,3 +10,4 @@ router.get('/health', (_req, res) => {
 
 router.post('/api/assistant/interpret', postInterpret);
 router.post('/api/assistant/respond', postRespond);
+router.post('/api/assistant/read-messages', postReadMessages);

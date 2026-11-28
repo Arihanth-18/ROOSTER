@@ -134,6 +134,30 @@ export async function fillFormOnScreen(): Promise<FillResult> {
   return JSON.parse(await NativeDevice.fillFormOnScreen()) as FillResult;
 }
 
+// ---------------------------------------------------------------------------- reading the screen
+
+export type ScreenText = { error: 'not_enabled' | 'no_window' | 'rooster_in_front' | 'home_screen' | 'failed' } | { app: string; lines: string[] };
+
+export async function readScreen(): Promise<ScreenText> {
+  return JSON.parse(await NativeDevice.readScreen()) as ScreenText;
+}
+
+// ---------------------------------------------------------------------------- Wispr Flow keyboard
+
+export const WISPR_PACKAGE = 'com.wispr.flowapp';
+export type KeyboardStatus = { installed: boolean; enabled: boolean; current: boolean };
+
+export async function getWisprStatus(): Promise<KeyboardStatus> {
+  return JSON.parse(await NativeDevice.getKeyboardStatus(WISPR_PACKAGE)) as KeyboardStatus;
+}
+
+export const openKeyboardSettings = () => NativeDevice.openKeyboardSettings();
+export const showKeyboardPicker = () => NativeDevice.showKeyboardPicker();
+export const getWisprFlow = () =>
+  NativeDevice.openUrl(`market://details?id=${WISPR_PACKAGE}`, 'com.android.vending').then(ok =>
+    ok ? true : NativeDevice.openUrl(`https://play.google.com/store/apps/details?id=${WISPR_PACKAGE}`, ''),
+  );
+
 // ---------------------------------------------------------------------------- phone's notes app
 
 export type NotesApp = { label: string; packageName: string; preferred: boolean };

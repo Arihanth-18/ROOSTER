@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
-import { InterpretRequestSchema, RespondRequestSchema } from '../validators/schemas.js';
-import { interpret, respond } from '../services/assistant.js';
+import { InterpretRequestSchema, ReadMessagesRequestSchema, RespondRequestSchema } from '../validators/schemas.js';
+import { interpret, readMessages, respond } from '../services/assistant.js';
 import { AiUnavailableError } from '../services/groq.js';
 
 /** 503 + machine-readable code lets the app announce "AI is offline" instead of inventing an answer. */
@@ -30,6 +30,20 @@ export async function postRespond(req: Request, res: Response, next: NextFunctio
   }
   try {
     res.json({ response: await respond(parsed.data) });
+  } catch (err) {
+    if (err instanceof AiUnavailableError) return aiUnavailable(res, err);
+    next(err);
+  }
+}
+
+export async function postReadMessages(req: Request, res: Response, next: NextFunction) {
+  const parsed = ReadMessagesRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_request', issues: parsed.error.issues.map(i => i.path.join('.')) });
+    return;
+  }
+  try {
+    res.json({ spoken: await readMessages(parsed.data) });
   } catch (err) {
     if (err instanceof AiUnavailableError) return aiUnavailable(res, err);
     next(err);

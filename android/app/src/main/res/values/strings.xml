@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">Rooster</string>
-    <string name="accessibility_summary">Fill forms by voice: say "fill this form".</string>
-    <string name="accessibility_description">When you say "fill this form", ROOSTER fills the empty fields it recognises (name, phone, email, address, city, state, PIN code, date of birth) with the details you saved in ROOSTER. It reads the screen only when you ask, never stores or uploads what is on screen, never presses submit, and never fills passwords, OTPs, PINs, card or bank details.</string>
+    <string name="accessibility_summary">Fill forms and read messages by voice: say "fill this form" or "read this message".</string>
+    <string name="accessibility_description">When you say "fill this form", ROOSTER fills the empty fields it recognises (name, phone, email, address, city, state, PIN code, date of birth) with the details you saved in ROOSTER. When you say "read this message", ROOSTER reads the messages on screen aloud, translated into your language if needed (the message text is sent to the ROOSTER assistant server only for that). It reads the screen only when you ask, never stores what is on screen, never presses submit, and never fills passwords, OTPs, PINs, card or bank details.</string>
 </resources>

@@ -32,6 +32,11 @@ export type AppSettings = {
   wakeMode: 'off' | 'screen_on' | 'always';
   /** Speak reminder notifications aloud when they fire. */
   speakReminders: boolean;
+  /**
+   * What the Talk button uses to turn speech into text: ROOSTER's own (Android) speech recognition,
+   * or the Wispr Flow keyboard (opens the text box so the user dictates with Wispr's mic).
+   */
+  dictation: 'rooster' | 'wispr';
   prefs: AccessibilityPrefs;
 };
 
@@ -63,5 +68,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sosShareLocation: true,
   wakeMode: 'off',
   speakReminders: true,
+  dictation: 'rooster',
   prefs: DEFAULT_PREFS,
 };

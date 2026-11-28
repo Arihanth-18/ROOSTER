@@ -258,6 +258,25 @@ describe('form filling command', () => {
   });
 });
 
+describe('reading messages on screen', () => {
+  it('understands "read this message" and the language to translate into', () => {
+    expect(parseOffline('read this message')).toMatchObject({ intent: 'read_screen', parameters: {} });
+    expect(parseOffline('what does this message say')?.intent).toBe('read_screen');
+    expect(parseOffline('read my whatsapp')?.intent).toBe('read_screen');
+    expect(parseOffline('translate this message to Kannada')?.parameters).toEqual({ target_language: 'kn' });
+    expect(parseOffline('read this message in Hindi')?.parameters).toEqual({ target_language: 'hi' });
+    expect(parseOffline('यह मैसेज पढ़ो')?.intent).toBe('read_screen');
+    expect(parseOffline('इसका हिंदी में अनुवाद करो')?.parameters).toEqual({ target_language: 'hi' });
+    expect(parseOffline('ಈ ಸಂದೇಶ ಓದು')?.intent).toBe('read_screen');
+    expect(parseOffline('ಕನ್ನಡಕ್ಕೆ ಅನುವಾದಿಸು')?.parameters).toEqual({ target_language: 'kn' });
+  });
+
+  it('keeps the camera reader and messaging separate', () => {
+    expect(parseOffline('read this text')?.intent).toBe('read_text');
+    expect(parseOffline('message Ravi saying hi')?.intent).toBe('prepare_sms');
+  });
+});
+
 describe('media app choice', () => {
   const yt = 'com.google.android.youtube';
   const ytm = 'com.google.android.apps.youtube.music';

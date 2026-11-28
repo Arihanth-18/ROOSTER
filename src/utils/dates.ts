@@ -59,6 +59,24 @@ export function formatTime(d: Date, lang: string): string {
   }
 }
 
+/** "Saturday, 28 November" for the header date pill. */
+export function formatLongDate(d: Date, lang: string): string {
+  try {
+    return d.toLocaleDateString(LOCALE_TAG[lang] ?? 'en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+  } catch {
+    return d.toDateString();
+  }
+}
+
+/** Short weekday and day number for the week strip: ["Sat", "28"]. */
+export function formatDayChip(d: Date, lang: string): [string, string] {
+  try {
+    return [d.toLocaleDateString(LOCALE_TAG[lang] ?? 'en-IN', { weekday: 'short' }), String(d.getDate())];
+  } catch {
+    return [['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()], String(d.getDate())];
+  }
+}
+
 export function formatDateTime(d: Date, lang: string): string {
   try {
     return d.toLocaleString(LOCALE_TAG[lang] ?? 'en-IN', {

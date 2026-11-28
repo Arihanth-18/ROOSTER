@@ -15,6 +15,11 @@ import {
   FORM_KEYS,
   getActiveNotifications,
   getFormProfile,
+  getWisprFlow,
+  getWisprStatus,
+  openKeyboardSettings,
+  showKeyboardPicker,
+  type KeyboardStatus,
   getLaunchableApps,
   isAccessibilityServiceEnabled,
   isAutofillServiceEnabled,
@@ -51,6 +56,7 @@ export function SettingsScreen() {
   const [profile, setProfile] = useState<FormProfile>({});
   const [autofillOn, setAutofillOn] = useState(false);
   const [voiceFillOn, setVoiceFillOn] = useState(false);
+  const [wispr, setWispr] = useState<KeyboardStatus | null>(null);
   const c = theme.colors;
 
   const refreshWake = useCallback(() => {
@@ -84,6 +90,7 @@ export function SettingsScreen() {
     refreshWake();
     isAutofillServiceEnabled().then(setAutofillOn).catch(() => {});
     isAccessibilityServiceEnabled().then(setVoiceFillOn).catch(() => {});
+    getWisprStatus().then(setWispr).catch(() => {});
   }, [settings.serverUrl, refreshWake]);
 
   useFocusEffect(refresh);
@@ -135,7 +142,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <Screen title={t('settings_title')}>
+    <Screen title={t('settings_title')} tab="settings">
       <Card>
         <Heading>{t('language')}</Heading>
         <Body>{LANGUAGE_OPTIONS.find(o => o.code === settings.language)?.native}</Body>
@@ -193,6 +200,27 @@ export function SettingsScreen() {
             ))}
           </>
         ) : null}
+      </Card>
+
+      <Card>
+        <Heading>🎙️ {t('wispr_title')}</Heading>
+        <Body muted>{t('wispr_hint')}</Body>
+        <Body bold>{`${wispr?.installed ? '✓' : '✕'} ${t('wispr_installed')}`}</Body>
+        <Body bold>{`${wispr?.enabled ? '✓' : '✕'} ${t('wispr_enabled')}`}</Body>
+        <Body bold>{`${wispr?.current ? '✓' : '✕'} ${t('wispr_current')}`}</Body>
+        {!wispr?.installed ? <BigButton label={t('wispr_get')} onPress={() => { getWisprFlow().catch(() => {}); }} /> : null}
+        {wispr?.installed && !wispr.enabled ? (
+          <BigButton label={t('wispr_turn_on')} onPress={openKeyboardSettings} />
+        ) : null}
+        {wispr?.enabled && !wispr.current ? (
+          <BigButton variant="secondary" label={t('wispr_switch')} onPress={showKeyboardPicker} />
+        ) : null}
+        <ToggleRow
+          label={t('wispr_use_for_talk')}
+          hint={t('wispr_use_for_talk_hint')}
+          value={settings.dictation === 'wispr'}
+          onChange={v => updateSettings({ dictation: v ? 'wispr' : 'rooster' })}
+        />
       </Card>
 
       <Card>

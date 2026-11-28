@@ -53,8 +53,13 @@ export function RepeatStopRow() {
   );
 }
 
-export function TypeBox({ initial = '' }: { initial?: string }) {
-  const { theme, t } = useApp();
+/**
+ * Type (or dictate with a keyboard such as Wispr Flow) a request. In Wispr Flow mode the box grows to
+ * show the whole dictated sentence and the hint says to use Wispr's mic.
+ */
+export function TypeBox({ initial = '', autoFocus = false }: { initial?: string; autoFocus?: boolean }) {
+  const { theme, t, settings } = useApp();
+  const wispr = settings.dictation === 'wispr';
   const { submitText, state } = useAssistant();
   const [text, setText] = useState(initial);
   const c = theme.colors;
@@ -67,16 +72,20 @@ export function TypeBox({ initial = '' }: { initial?: string }) {
   return (
     <View style={{ flexDirection: 'row', gap: theme.space(1), alignItems: 'stretch' }}>
       <TextInput
-        accessibilityLabel={t('type_placeholder')}
+        accessibilityLabel={wispr ? t('type_placeholder_wispr') : t('type_placeholder')}
         value={text}
         onChangeText={setText}
-        placeholder={t('type_placeholder')}
+        autoFocus={autoFocus}
+        multiline={wispr}
+        placeholder={wispr ? t('type_placeholder_wispr') : t('type_placeholder')}
         placeholderTextColor={c.textMuted}
         onSubmitEditing={send}
         returnKeyType="send"
         style={{
           flex: 1,
           minHeight: theme.touch,
+          maxHeight: wispr ? theme.touch * 3 : undefined,
+          paddingVertical: wispr ? theme.space(1) : undefined,
           borderWidth: Math.max(2, c.borderWidth),
           borderColor: c.border,
           borderRadius: theme.radius,

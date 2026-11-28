@@ -23,6 +23,7 @@ export type Intent =
   | 'get_directions'
   | 'flashlight'
   | 'fill_form'
+  | 'read_screen'
   | 'navigate'
   | 'remember_fact'
   | 'daily_summary'
@@ -44,6 +45,8 @@ export type IntentParameters = {
   contact_name?: string;
   message?: string;
   channel?: 'sms' | 'whatsapp';
+  /** read_screen: the language the user asked to translate into. */
+  target_language?: Language;
   /** Timer length. */
   duration_seconds?: number;
   control?: 'play' | 'pause' | 'next' | 'previous' | 'stop' | 'volume_up' | 'volume_down' | 'mute' | 'unmute' | 'volume_max';

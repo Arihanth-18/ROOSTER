@@ -18,6 +18,7 @@ type Props = {
 export function BigButton({ label, onPress, variant = 'primary', icon, hint, disabled, style, compact, accessibilityLabel }: Props) {
   const { theme, haptic } = useApp();
   const c = theme.colors;
+  // Black pill for the main action, white pill with a black outline for the rest.
   const bg = { primary: c.primary, secondary: c.surface, danger: c.danger, ghost: 'transparent' }[variant];
   const fg = { primary: c.onPrimary, secondary: c.primary, danger: c.onDanger, ghost: c.primary }[variant];
   const border = variant === 'secondary' || variant === 'ghost' ? c.primary : bg;
@@ -35,7 +36,7 @@ export function BigButton({ label, onPress, variant = 'primary', icon, hint, dis
       style={({ pressed }) => [
         {
           minHeight: compact ? Math.max(48, theme.touch - 8) : theme.touch,
-          borderRadius: theme.radius,
+          borderRadius: 999,
           backgroundColor: pressed && variant === 'primary' ? c.primaryPressed : bg,
           borderWidth: Math.max(2, c.borderWidth),
           borderColor: border,

@@ -110,7 +110,7 @@ export function ReaderScreen() {
   const chunks = splitForSpeech(text);
 
   return (
-    <Screen title={t('reader_title')} intro={t('reader_intro')}>
+    <Screen title={t('reader_title')} intro={t('reader_intro')} tab="reader">
       <Body>{t('reader_intro')}</Body>
       <View style={{ flexDirection: 'row', gap: theme.space(1.5) }}>
         <BigButton style={{ flex: 1 }} icon="📷" label={t('take_photo')} onPress={capture} disabled={phase === 'reading_image'} />

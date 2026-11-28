@@ -24,6 +24,7 @@ export const INTENTS = [
   'get_directions',
   'flashlight',
   'fill_form',
+  'read_screen',
   'navigate',
   'remember_fact',
   'daily_summary',
@@ -85,6 +86,8 @@ export const ParametersSchema = z
     contact_name: shortText(100).optional(),
     message: shortText(500).optional(),
     channel: z.enum(['sms', 'whatsapp']).optional(),
+    /** Language to read/translate a message into, when the user names one ("translate to Kannada"). */
+    target_language: z.enum(LANGUAGES).optional(),
     duration_seconds: z.coerce.number().int().min(1).max(86400).optional(),
     control: z.enum(['play', 'pause', 'next', 'previous', 'stop', 'volume_up', 'volume_down', 'mute', 'unmute', 'volume_max']).optional(),
     state: z.enum(['on', 'off']).optional(),
@@ -103,3 +106,26 @@ export const IntentResultSchema = z.object({
   natural_language_response: shortText(1000).catch(''),
 });
 export type IntentResult = z.infer<typeof IntentResultSchema>;
+
+/** Text copied from the phone screen or notifications, to be read aloud (translated if needed). */
+export const ReadMessagesRequestSchema = z.object({
+  text: z.string().trim().min(1).max(4000),
+  target: z.enum(LANGUAGES),
+  source: z.enum(['screen', 'notifications']).default('screen'),
+});
+export type ReadMessagesRequest = z.infer<typeof ReadMessagesRequestSchema>;
+
+/** What the model returns for read-messages (validated; anything malformed degrades to empty). */
+export const ReadMessagesResultSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        from: z.string().trim().max(60).nullable().catch(null),
+        time: z.string().trim().max(20).nullable().catch(null),
+        text: z.string().trim().max(800),
+      }),
+    )
+    .max(12)
+    .catch([]),
+  scam: z.boolean().catch(false),
+});

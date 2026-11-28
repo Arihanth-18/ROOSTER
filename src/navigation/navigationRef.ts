@@ -5,8 +5,9 @@ export type RootStackParamList = {
   Language: { fromSettings?: boolean } | undefined;
   AccessibilitySetup: { fromSettings?: boolean } | undefined;
   Home: undefined;
-  Conversation: undefined;
-  Reminders: { tab?: 'reminders' | 'notes' | 'facts' } | undefined;
+  /** `dictate`: open with the text box focused (Wispr Flow keyboard mode); a new value refocuses it. */
+  Conversation: { dictate?: number } | undefined;
+  Reminders: { tab?: 'reminders' | 'notes' | 'facts'; add?: boolean } | undefined;
   Reader: { autoCapture?: boolean } | undefined;
   Emergency: { startSos?: boolean } | undefined;
   Settings: undefined;

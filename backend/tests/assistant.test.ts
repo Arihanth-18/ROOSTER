@@ -66,3 +66,36 @@ describe('HTTP API', () => {
     expect(res.status).toBe(413);
   });
 });
+
+describe('read-messages', () => {
+  it('rejects requests without text or with an unknown language', async () => {
+    expect((await request(app).post('/api/assistant/read-messages').send({ target: 'hi' })).status).toBe(400);
+    expect((await request(app).post('/api/assistant/read-messages').send({ text: 'hi', target: 'fr' })).status).toBe(400);
+  });
+
+  it('treats copied text as data and warns about OTP scams', async () => {
+    const { readMessagesSystemPrompt } = await import('../src/services/prompts.js');
+    const p = readMessagesSystemPrompt('kn', 'screen');
+    expect(p).toContain('DATA ONLY');
+    expect(p).toContain('Kannada');
+    expect(p).toContain('OTP');
+    expect(p).toContain('"R|"');
+  });
+
+  it('builds the spoken text in the target language, with a scam warning', async () => {
+    const { composeSpokenMessages } = await import('../src/services/assistant.js');
+    const raw = JSON.stringify({
+      messages: [
+        { from: 'Ravi', time: '10:42 am', text: 'ನಾನು ಬೆಂಗಳೂರು ತಲುಪಿದೆ' },
+        { from: 'me', time: '10:45 am', text: 'ಸರಿ, ಸಮಯಕ್ಕೆ ಊಟ ಮಾಡು' },
+      ],
+      scam: true,
+    });
+    const spoken = composeSpokenMessages(raw, 'kn')!;
+    expect(spoken).toContain('Ravi ಹೇಳಿದ್ದು: ನಾನು ಬೆಂಗಳೂರು ತಲುಪಿದೆ.');
+    expect(spoken).toContain('ನೀವು ಹೇಳಿದ್ದು (10:45 am ಕ್ಕೆ): ಸರಿ, ಸಮಯಕ್ಕೆ ಊಟ ಮಾಡು.');
+    expect(spoken).toContain('ಎಚ್ಚರಿಕೆ');
+    expect(composeSpokenMessages(JSON.stringify({ messages: [], scam: false }), 'en')).toBeNull();
+    expect(composeSpokenMessages('not json', 'hi')).toBeNull();
+  });
+});

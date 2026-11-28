@@ -157,10 +157,10 @@ export function RoosterAvatar({ state, size = 220, onPress, accessibilityLabel, 
       <Svg width={s} height={s} viewBox="0 0 100 100">
         <Defs>
           <LinearGradient id="iris" x1="0.1" y1="0.9" x2="0.95" y2="0.15">
-            <Stop offset="0" stopColor="#5EE7F5" />
-            <Stop offset="0.35" stopColor="#8FA8FF" />
-            <Stop offset="0.6" stopColor="#C59BFF" />
-            <Stop offset="1" stopColor="#FF9FD2" />
+            <Stop offset="0" stopColor="#7DD3FC" />
+            <Stop offset="0.35" stopColor="#9BE3F7" />
+            <Stop offset="0.6" stopColor="#8FE6C6" />
+            <Stop offset="1" stopColor="#5FD3A0" />
           </LinearGradient>
           <RadialGradient id="shine" cx="0.32" cy="0.26" r="0.42">
             <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
@@ -169,7 +169,7 @@ export function RoosterAvatar({ state, size = 220, onPress, accessibilityLabel, 
           </RadialGradient>
           <RadialGradient id="rim" cx="0.5" cy="0.5" r="0.5">
             <Stop offset="0.82" stopColor="#FFFFFF" stopOpacity="0" />
-            <Stop offset="1" stopColor="#3B2E7E" stopOpacity="0.35" />
+            <Stop offset="1" stopColor="#0B3A5C" stopOpacity="0.3" />
           </RadialGradient>
           <RadialGradient id="blush" cx="0.5" cy="0.5" r="0.5">
             <Stop offset="0" stopColor="#FF6FAE" stopOpacity="0.55" />
@@ -216,7 +216,7 @@ export function RoosterAvatar({ state, size = 220, onPress, accessibilityLabel, 
           width: s * 1.12,
           height: s * 1.12,
           borderRadius: s,
-          backgroundColor: '#7DD3FC',
+          backgroundColor: '#7EE0B5',
           opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.45] }),
           transform: [{ scale: glowScale }],
         }}

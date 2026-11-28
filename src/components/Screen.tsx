@@ -4,6 +4,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../app/AppContext';
 import { speak } from '../services/speech';
+import { BottomNav, type TabKey } from './BottomNav';
+import { cardShadow } from './Controls';
 
 type Props = {
   title: string;
@@ -13,13 +15,23 @@ type Props = {
   showBack?: boolean;
   scroll?: boolean;
   footer?: React.ReactNode;
+  /** Shown under the title inside the blue header (e.g. today's date). */
+  headerExtra?: React.ReactNode;
+  /** Shows the bottom navigation bar with this tab highlighted. */
+  tab?: TabKey;
 };
 
-export function Screen({ title, intro, children, showBack = true, scroll = true, footer }: Props) {
+/**
+ * Page layout: light-blue header band with a large centred title and a big rounded Back button,
+ * a light-blue page for white cards, and (on main screens) the bottom navigation bar.
+ */
+export function Screen({ title, intro, children, showBack = true, scroll = true, footer, headerExtra, tab }: Props) {
   const { theme, prefs, t } = useApp();
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
+  const canBack = showBack && nav.canGoBack();
+  const side = theme.touch;
 
   useFocusEffect(
     useCallback(() => {
@@ -36,32 +48,56 @@ export function Screen({ title, intro, children, showBack = true, scroll = true,
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.background, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
       <StatusBar barStyle="dark-content" />
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
+          backgroundColor: c.hero,
+          paddingTop: insets.top + theme.space(1),
+          paddingBottom: theme.space(2),
           paddingHorizontal: theme.space(1.5),
-          minHeight: theme.touch + 8,
-          borderBottomWidth: c.borderWidth,
-          borderBottomColor: c.border,
-          gap: theme.space(1),
+          borderBottomLeftRadius: 32,
+          borderBottomRightRadius: 32,
+          borderBottomWidth: c.shadow ? 0 : c.borderWidth,
+          borderColor: c.border,
+          gap: theme.space(1.25),
         }}
       >
-        {showBack && nav.canGoBack() ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('back')}
-            onPress={() => nav.goBack()}
-            style={{ minWidth: theme.touch, minHeight: theme.touch, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius }}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space(1) }}>
+          {canBack ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('back')}
+              onPress={() => nav.goBack()}
+              style={({ pressed }) => [
+                {
+                  width: side,
+                  height: side,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: pressed ? c.surfaceAlt : c.surface,
+                  borderWidth: c.shadow ? 0 : c.borderWidth,
+                  borderColor: c.border,
+                },
+                c.shadow ? cardShadow : null,
+              ]}
+            >
+              <Text style={{ fontSize: theme.font.title, color: c.text, fontWeight: theme.bold, marginTop: -4 }}>‹</Text>
+            </Pressable>
+          ) : (
+            <View style={{ width: side }} />
+          )}
+          <Text
+            accessibilityRole="header"
+            style={{ flex: 1, textAlign: 'center', fontSize: theme.font.heading + 2, fontWeight: theme.bold, color: c.text }}
+            numberOfLines={2}
           >
-            <Text style={{ fontSize: theme.font.title, color: c.primary, fontWeight: theme.bold }}>‹</Text>
-          </Pressable>
-        ) : null}
-        <Text accessibilityRole="header" style={{ flex: 1, fontSize: theme.font.heading, fontWeight: theme.bold, color: c.text }} numberOfLines={2}>
-          {title}
-        </Text>
+            {title}
+          </Text>
+          <View style={{ width: side }} />
+        </View>
+        {headerExtra ? <View style={{ alignItems: 'center' }}>{headerExtra}</View> : null}
       </View>
       {scroll ? (
         <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
@@ -71,12 +107,45 @@ export function Screen({ title, intro, children, showBack = true, scroll = true,
         <View style={{ flex: 1 }}>{body}</View>
       )}
       {footer ? (
-        <View style={{ padding: theme.space(2), paddingBottom: theme.space(2) + insets.bottom, borderTopWidth: c.borderWidth, borderTopColor: c.border, backgroundColor: c.background }}>
+        <View
+          style={{
+            padding: theme.space(2),
+            paddingBottom: theme.space(2) + (tab ? 0 : insets.bottom),
+            borderTopWidth: c.borderWidth,
+            borderTopColor: c.border,
+            backgroundColor: c.background,
+          }}
+        >
           {footer}
         </View>
-      ) : (
-        <View style={{ height: insets.bottom }} />
-      )}
+      ) : null}
+      {tab ? <BottomNav active={tab} /> : footer ? null : <View style={{ height: insets.bottom }} />}
+    </View>
+  );
+}
+
+/** Rounded date pill for the header, e.g. "🗓️ Saturday, 28 November". (Not 📅: it shows a fixed "July 17".) */
+export function DatePill({ text }: { text: string }) {
+  const { theme } = useApp();
+  const c = theme.colors;
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: c.surface,
+        borderRadius: 999,
+        paddingHorizontal: theme.space(2),
+        paddingVertical: theme.space(0.75),
+        borderWidth: c.shadow ? 0 : c.borderWidth,
+        borderColor: c.border,
+      }}
+    >
+      <Text style={{ fontSize: theme.font.body }} importantForAccessibility="no">
+        🗓️
+      </Text>
+      <Text style={{ fontSize: theme.font.body, fontWeight: theme.bold, color: c.text }}>{text}</Text>
     </View>
   );
 }

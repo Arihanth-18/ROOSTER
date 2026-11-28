@@ -31,6 +31,55 @@ class RoosterAccessibilityService : AccessibilityService() {
   /** Package of the app currently in front, or null. */
   fun activePackage(): String? = rootInActiveWindow?.packageName?.toString()
 
+  /**
+   * "Read this message": the visible text of the app in front, top to bottom, for the backend to pick
+   * out the messages. Typing boxes and password fields are skipped; nothing is stored.
+   * JSON { app, lines: [...] } or { error }.
+   */
+  fun readActiveScreen(): JSONObject {
+    val root = rootInActiveWindow ?: return JSONObject().put("error", "no_window")
+    val app = root.packageName?.toString().orEmpty()
+    if (app == packageName) return JSONObject().put("error", "rooster_in_front")
+    val home = packageManager.resolveActivity(
+      android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME), 0,
+    )?.activityInfo?.packageName
+    if (app == home) return JSONObject().put("error", "home_screen")
+    // Chat apps put received messages on the left and the user's own on the right: mark each line
+    // "L|", "R|" or "C|" so the backend can say who wrote what.
+    val screenWidth = resources.displayMetrics.widthPixels.coerceAtLeast(1)
+    val bounds = android.graphics.Rect()
+    val lines = ArrayList<String>()
+    fun walk(node: AccessibilityNodeInfo?) {
+      if (node == null || !node.isVisibleToUser) return
+      if (!node.isEditable && !node.isPassword) {
+        val text = node.text?.toString()?.trim().orEmpty()
+        if (text.isNotEmpty()) {
+          node.getBoundsInScreen(bounds)
+          val left = bounds.left.toFloat() / screenWidth
+          val right = bounds.right.toFloat() / screenWidth
+          val side = when {
+            left > 0.25f && right > 0.9f -> "R"
+            left < 0.2f && right < 0.85f -> "L"
+            else -> "C"
+          }
+          val line = "$side|$text"
+          if (lines.lastOrNull() != line) lines.add(line)
+        }
+      }
+      for (i in 0 until node.childCount) walk(node.getChild(i))
+    }
+    walk(root)
+    // Newest messages are at the bottom of chat screens: keep the end if the screen is long.
+    var total = 0
+    val kept = ArrayList<String>()
+    for (line in lines.asReversed()) {
+      if (total + line.length > 3500) break
+      kept.add(0, line)
+      total += line.length + 1
+    }
+    return JSONObject().put("app", app).put("lines", JSONArray(kept))
+  }
+
   /** JSON { app, filled: [{ key, label }], skipped } or { error }. */
   fun fillActiveForm(profile: Map<String, String>): JSONObject {
     val root = rootInActiveWindow ?: return JSONObject().put("error", "no_window")

@@ -2,19 +2,31 @@ import React from 'react';
 import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { useApp } from '../app/AppContext';
 
+/** Soft shadow for white cards on the light-blue page. */
+export const cardShadow = {
+  elevation: 3,
+  shadowColor: '#0B3A5C',
+  shadowOpacity: 0.12,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 4 },
+} as const;
+
 export function Card({ children, accent }: { children: React.ReactNode; accent?: 'danger' | 'warning' }) {
   const { theme } = useApp();
   const c = theme.colors;
   return (
     <View
-      style={{
-        backgroundColor: accent === 'warning' ? c.warningBg : c.surface,
-        borderRadius: theme.radius,
-        borderWidth: accent ? 2 : c.borderWidth,
-        borderColor: accent === 'danger' ? c.danger : accent === 'warning' ? c.warning : c.border,
-        padding: theme.space(2),
-        gap: theme.space(1.5),
-      }}
+      style={[
+        {
+          backgroundColor: accent === 'warning' ? c.warningBg : c.surface,
+          borderRadius: theme.radius,
+          borderWidth: accent ? 2 : c.shadow ? 0 : c.borderWidth,
+          borderColor: accent === 'danger' ? c.danger : accent === 'warning' ? c.warning : c.border,
+          padding: theme.space(2.25),
+          gap: theme.space(1.5),
+        },
+        c.shadow ? cardShadow : null,
+      ]}
     >
       {children}
     </View>
@@ -109,7 +121,10 @@ export function OptionGroup<T extends string>({
   const { theme, haptic } = useApp();
   const c = theme.colors;
   // Long labels (or large text) get one full-width row each, so words never break mid-word.
-  const stacked = options.some(o => o.label.length > 14) || theme.font.body > 24;
+  const longest = Math.max(...options.map(o => o.label.length));
+  // Rough fit check: would the longest word fit in an equal share of the row at this text size?
+  const fits = longest * theme.font.body * 0.62 + 40 < 340 / options.length;
+  const stacked = !fits || longest > 14 || theme.font.body > 24;
   return (
     <View accessibilityRole="radiogroup" accessibilityLabel={label} style={{ gap: theme.space(1) }}>
       {label ? <Text style={{ fontSize: theme.font.body, fontWeight: theme.bold, color: c.text }}>{label}</Text> : null}

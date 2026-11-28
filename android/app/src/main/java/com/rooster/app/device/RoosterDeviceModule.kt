@@ -9,6 +9,7 @@ import android.media.AudioManager
 import android.provider.MediaStore
 import android.view.KeyEvent
 import android.view.autofill.AutofillManager
+import android.view.inputmethod.InputMethodManager
 import android.content.ComponentName
 import com.rooster.app.forms.FormProfile
 import com.rooster.app.forms.RoosterAccessibilityService
@@ -351,6 +352,18 @@ class RoosterDeviceModule(private val ctx: ReactApplicationContext) : NativeRoos
     if (service == null) { promise.resolve("""{"error":"not_enabled"}"""); return }
     val profile = FormProfile.load(ctx)
     if (profile.isEmpty()) { promise.resolve("""{"error":"no_profile"}"""); return }
+    withAppBehind(service, promise) { service.fillActiveForm(profile) }
+  }
+
+  /** "Read this message": visible text of the app behind ROOSTER. JSON { app, lines } or { error }. */
+  override fun readScreen(promise: Promise) {
+    val service = RoosterAccessibilityService.instance
+    if (service == null) { promise.resolve("""{"error":"not_enabled"}"""); return }
+    withAppBehind(service, promise) { service.readActiveScreen() }
+  }
+
+  /** Steps ROOSTER aside, waits until the app underneath is in front, then runs [action]. */
+  private fun withAppBehind(service: RoosterAccessibilityService, promise: Promise, action: () -> JSONObject) {
     ctx.currentActivity?.let { a -> a.runOnUiThread { a.moveTaskToBack(true) } }
     io.execute {
       try {
@@ -358,12 +371,33 @@ class RoosterDeviceModule(private val ctx: ReactApplicationContext) : NativeRoos
         while (System.currentTimeMillis() < deadline && service.activePackage().let { it == null || it == ctx.packageName }) {
           Thread.sleep(150)
         }
-        Thread.sleep(400) // let the form finish drawing
-        promise.resolve(service.fillActiveForm(profile).toString())
+        Thread.sleep(400) // let the screen finish drawing
+        promise.resolve(action().toString())
       } catch (e: Exception) {
         promise.resolve(JSONObject().put("error", "failed").toString())
       }
     }
+  }
+
+  // ------------------------------------------------------------ keyboards (Wispr Flow)
+
+  /** JSON { installed, enabled, current } for a keyboard app such as Wispr Flow. */
+  override fun getKeyboardStatus(packageName: String, promise: Promise) {
+    val installed = try { ctx.packageManager.getPackageInfo(packageName, 0); true } catch (_: Exception) { false }
+    val imm = ctx.getSystemService(InputMethodManager::class.java)
+    val enabled = imm?.enabledInputMethodList?.any { it.packageName == packageName } == true
+    val current = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+      ?.startsWith("$packageName/") == true
+    promise.resolve(JSONObject().put("installed", installed).put("enabled", enabled).put("current", current).toString())
+  }
+
+  override fun openKeyboardSettings() {
+    if (!launch(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))) launch(Intent(Settings.ACTION_SETTINGS))
+  }
+
+  /** Android's "Choose keyboard" pop-up (only works while ROOSTER is on screen). */
+  override fun showKeyboardPicker() {
+    ctx.currentActivity?.runOnUiThread { ctx.getSystemService(InputMethodManager::class.java)?.showInputMethodPicker() }
   }
 
   // ------------------------------------------------------------ phone's notes app

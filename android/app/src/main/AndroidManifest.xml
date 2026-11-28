@@ -65,6 +65,8 @@
         <intent>
             <action android:name="android.intent.action.SET_TIMER" />
         </intent>
+        <!-- Wispr Flow keyboard: check it's installed and set up, for dictating into ROOSTER. -->
+        <package android:name="com.wispr.flowapp" />
         <!-- Play music/videos by voice in YouTube, YouTube Music, Spotify... and search the web. -->
         <intent>
             <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />

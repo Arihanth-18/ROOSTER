@@ -19,6 +19,7 @@ import {
   mediaControl,
   openUrl,
   openWhatsAppChat,
+  readScreen,
   playFromSearch,
   setFlashlight,
   webSearch,
@@ -32,7 +33,7 @@ import {
 } from '../services/device';
 import { describeWhen, deleteReminder, ReminderInPastError, saveReminder, todaysReminders, upcomingReminders } from '../services/reminders';
 import { getLastSpoken, stopSpeaking } from '../services/speech';
-import { respond } from '../services/assistantClient';
+import { readMessages, respond } from '../services/assistantClient';
 import { fuzzyFind, matchContact, type MatchableContact } from '../utils/contactMatch';
 import { formatTime, parseLocalDateTime } from '../utils/dates';
 import { needsConfirmation } from './policy';
@@ -370,8 +371,15 @@ export async function execute(ctx: ExecContext, r: IntentResult, draft: Draft | 
       const list = (await getActiveNotifications()).filter(n => allowed.includes(n.packageName)).slice(0, 5);
       if (!list.length) return { say: t('notifications_none') };
       const items = list.map(n => `${n.app}. ${n.title}. ${n.text}`).join('. ');
-      return { say: `${t('notifications_intro', { count: list.length })} ${items}` };
+      // Translate into the user's language when the AI is reachable; otherwise read them as they are.
+      const spoken = ctx.aiAvailable
+        ? await readMessages(settings.serverUrl, list.map(n => `${n.app} | ${n.title}: ${n.text}`).join('\n'), lang, 'notifications').catch(() => undefined)
+        : undefined;
+      return { say: `${t('notifications_intro', { count: list.length })} ${spoken ?? items}` };
     }
+
+    case 'read_screen':
+      return readScreenAloud(ctx, r);
 
     case 'unknown':
     default:
@@ -451,6 +459,41 @@ async function searchApp(ctx: ExecContext, r: IntentResult): Promise<ExecResult>
   if (!(await confirm(ctx, r, t('confirm_search', { query, app: target.label })))) return { say: t('cancelled') };
   const ok = await openUrl(target.searchUrl(query), installed ? target.packageName : '');
   return { say: ok ? t('search_opened', { app: target.label, query }) : t('action_failed') };
+}
+
+// ---------------------------------------------------------------------------- reading messages on screen
+
+/**
+ * "Read this message": reads the chat/SMS open behind ROOSTER and speaks the messages, translated
+ * into the user's language (or the one they named). Without the AI it reads the newest lines as they are.
+ */
+async function readScreenAloud(ctx: ExecContext, r: IntentResult): Promise<ExecResult> {
+  const { t, settings } = ctx;
+  if (!(await isAccessibilityServiceEnabled().catch(() => false))) {
+    openAccessibilitySettings();
+    return { say: t('read_screen_needs_access') };
+  }
+  const screen = await readScreen().catch(() => ({ error: 'failed' as const }));
+  if ('error' in screen) {
+    if (screen.error === 'not_enabled') {
+      openAccessibilitySettings();
+      return { say: t('read_screen_needs_access') };
+    }
+    if (screen.error === 'failed') return { say: t('action_failed') };
+    return { say: t('read_screen_nothing_open') };
+  }
+  if (!screen.lines.length) return { say: t('read_screen_no_messages') };
+  const target = r.parameters.target_language ?? settings.language;
+  if (ctx.aiAvailable) {
+    try {
+      const spoken = await readMessages(settings.serverUrl, screen.lines.join('\n'), target, 'screen');
+      return { say: spoken ?? t('read_screen_no_messages') };
+    } catch {
+      // fall through to reading the text as it is
+    }
+  }
+  const tail = screen.lines.slice(-6).join('. ').slice(-700);
+  return { say: `${t('read_screen_untranslated')} ${tail}` };
 }
 
 // ---------------------------------------------------------------------------- form filling

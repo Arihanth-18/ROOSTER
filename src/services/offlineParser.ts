@@ -244,6 +244,15 @@ function parseMedia(text: string): IntentResult | null {
 const FILL_FORM =
   /\b(?:fill|complete)\s+(?:in\s+|out\s+|up\s+)?(?:this|the|my)?\s*(?:form|details)\b|\bfill (?:it|this) (?:in|up)\b|\bautofill\b|(?:फॉर्म|फ़ॉर्म|फार्म)\s*(?:भरो|भर दो|भरें)|(?:ಫಾರ್ಮ್|ಅರ್ಜಿ)\s*(?:ತುಂಬು|ತುಂಬಿ|ಭರ್ತಿ)/i;
 
+/** "Read this message", "translate this message to Kannada", "यह मैसेज पढ़ो", "ಈ ಸಂದೇಶ ಓದು". */
+const READ_SCREEN =
+  /\b(?:read|what does)\s+(?:out\s+)?(?:this|the|that|my)?\s*(?:messages?|sms|chat|screen|whatsapp)\b|\btranslate\s+(?:this|the|that|my)?\s*(?:messages?|sms|chat|screen|text)?\b|(?:मैसेज|संदेश|एसएमएस|स्क्रीन)\s*(?:पढ़ो|पढ़कर सुनाओ|पढ़ कर सुनाओ|पढ़ें|सुनाओ)|(?:अनुवाद|ट्रांसलेट)\s*(?:करो|करें|कर दो)|(?:ಸಂದೇಶ|ಮೆಸೇಜ್|ಸ್ಕ್ರೀನ್)\s*(?:ಓದು|ಓದಿ|ಓದಿ ಹೇಳು)|ಅನುವಾದ\s*(?:ಮಾಡು|ಮಾಡಿ)|ಅನುವಾದಿಸು|ಅನುವಾದಿಸಿ/i;
+const TARGET_LANGUAGE: Array<[RegExp, 'en' | 'hi' | 'kn']> = [
+  [/\b(?:in|into|to)\s+kannada\b|कन्नड़|ಕನ್ನಡ/i, 'kn'],
+  [/\b(?:in|into|to)\s+hindi\b|हिंदी|हिन्दी|ಹಿಂದಿ/i, 'hi'],
+  [/\b(?:in|into|to)\s+english\b|अंग्रेज़ी|अंग्रेजी|इंग्लिश|ಇಂಗ್ಲಿಷ್/i, 'en'],
+];
+
 const NOTE_PATTERNS: RegExp[] = [
   /^(?:please\s+)?(?:take|make|create|add|write|save)\s+(?:a\s+)?note(?:\s+(?:that|saying|of|about))?[\s:,-]*(.*?)[\s.!]*$/i,
   /^(?:please\s+)?(?:note down|write down|jot down|note)(?:\s+that)?[\s:,-]+(.+?)[\s.!]*$/i,
@@ -292,6 +301,10 @@ export function parseOffline(input: string, now: Date = new Date()): IntentResul
     if (m) return result('call_contact', { contact_name: m[1].trim() });
   }
   if (FILL_FORM.test(text)) return result('fill_form');
+  if (READ_SCREEN.test(text)) {
+    const target = TARGET_LANGUAGE.find(([re]) => re.test(text))?.[1];
+    return result('read_screen', target ? { target_language: target } : {});
+  }
   for (const re of NOTE_PATTERNS) {
     const m = re.exec(text);
     if (m) {

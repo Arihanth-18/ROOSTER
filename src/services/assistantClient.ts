@@ -7,6 +7,8 @@ export class AiOfflineError extends Error {
   }
 }
 
+type ReadMessagesBody = { text: string; target: Language; source: 'screen' | 'notifications' };
+
 type RequestBody = {
   text: string;
   language: Language;
@@ -15,7 +17,7 @@ type RequestBody = {
   history: Array<{ role: 'user' | 'assistant'; text: string }>;
 };
 
-async function post<T>(serverUrl: string, path: string, body: RequestBody, timeoutMs: number): Promise<T> {
+async function post<T>(serverUrl: string, path: string, body: RequestBody | ReadMessagesBody, timeoutMs: number): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -69,6 +71,20 @@ export async function respond(
 ): Promise<string> {
   const r = await post<{ response: string }>(serverUrl, '/api/assistant/respond', buildBody(text, language, simpleLanguage, history), 15000);
   return r.response ?? '';
+}
+
+/**
+ * Picks the messages out of text copied from the screen or notifications and returns them ready to
+ * read aloud in `target` (translated when needed). Null when there were no messages.
+ */
+export async function readMessages(
+  serverUrl: string,
+  text: string,
+  target: Language,
+  source: 'screen' | 'notifications' = 'screen',
+): Promise<string | null> {
+  const r = await post<{ spoken: string | null }>(serverUrl, '/api/assistant/read-messages', { text: text.slice(0, 4000), target, source }, 20000);
+  return r.spoken ?? null;
 }
 
 export type ServerHealth = 'ok' | 'no_key' | 'down';

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
 import { useApp } from '../app/AppContext';
 import { useDialog } from '../components/DialogProvider';
@@ -19,7 +19,9 @@ import {
 import { getReminderHealth, openBatterySettings, openExactAlarmSettings, openAppSettings, type ReminderHealth } from '../services/device';
 import { ensurePermission } from '../assistant/permissions';
 import { speak } from '../services/speech';
-import { formatDateTime, formatTime, parseLocalDateTime, toLocalDateTime } from '../utils/dates';
+import { formatDateTime, formatDayChip, formatLongDate, formatTime, occursOn, parseLocalDateTime, toLocalDateTime } from '../utils/dates';
+import { cardShadow } from '../components/Controls';
+import { TYPE_ICON } from '../components/ActivityCarousel';
 import type { RootStackParamList } from '../navigation/navigationRef';
 import type { Note, Reminder } from '../types';
 
@@ -30,7 +32,7 @@ export function RemindersScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Reminders'>>();
   const [tab, setTab] = useState<Tab>(route.params?.tab ?? 'reminders');
   return (
-    <Screen title={t('nav_reminders')}>
+    <Screen title={t('nav_reminders')} tab="reminders">
       <OptionGroup
         label=""
         value={tab}
@@ -42,7 +44,7 @@ export function RemindersScreen() {
         ]}
       />
       <View style={{ gap: theme.space(2) }}>
-        {tab === 'reminders' ? <RemindersTab /> : tab === 'notes' ? <TextItemsTab kind="notes" /> : <TextItemsTab kind="facts" />}
+        {tab === 'reminders' ? <RemindersTab startAdding={!!route.params?.add} /> : tab === 'notes' ? <TextItemsTab kind="notes" /> : <TextItemsTab kind="facts" />}
       </View>
     </Screen>
   );
@@ -50,13 +52,14 @@ export function RemindersScreen() {
 
 // ---------------------------------------------------------------------------- reminders tab
 
-function RemindersTab() {
+function RemindersTab({ startAdding }: { startAdding: boolean }) {
   const { t, theme, settings } = useApp();
   const dialog = useDialog();
   const lang = settings.language;
   const [items, setItems] = useState<Reminder[]>([]);
   const [health, setHealth] = useState<ReminderHealth | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(startAdding);
+  const [dayOffset, setDayOffset] = useState(0);
   const c = theme.colors;
 
   const load = useCallback(() => {
@@ -72,11 +75,25 @@ function RemindersTab() {
   );
 
   const now = new Date();
-  const upcoming = items
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const week = Array.from({ length: 7 }, (_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + i));
+  const day = week[dayOffset];
+  const onDay = (d: Date) => items.filter(r => occursOn(r.localDateTime, r.recurrence, d));
+  // The selected day's reminders, at their time on that day.
+  const dayItems = onDay(day)
+    .map(r => {
+      const base = parseLocalDateTime(r.localDateTime)!;
+      return { r, at: new Date(day.getFullYear(), day.getMonth(), day.getDate(), base.getHours(), base.getMinutes()) };
+    })
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
+  // One-time reminders further away than this week.
+  const weekEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7);
+  const later = items
     .map(r => ({ r, at: nextTriggerOf(r, now) }))
-    .filter(x => x.at)
+    .filter(x => x.at && x.at >= weekEnd)
     .sort((a, b) => a.at!.getTime() - b.at!.getTime());
-  const done = items.filter(r => r.recurrence === 'none' && (r.completed || !nextTriggerOf(r, now)));
+  const done = items.filter(r => r.recurrence === 'none' && (r.completed || !nextTriggerOf(r, now)) && !occursOn(r.localDateTime, r.recurrence, day));
+  const tint: Record<Reminder['type'], string> = { medicine: c.tintMedicine, appointment: c.tintAppointment, task: c.tintTask };
 
   const remove = async (r: Reminder) => {
     const ok = await dialog.ask({ message: t('confirm_delete', { title: r.title }), yesLabel: t('delete'), danger: true });
@@ -100,27 +117,91 @@ function RemindersTab() {
       {health && !health.exact ? <Banner text={t('exact_alarm_warning')} actionLabel={t('fix')} onAction={openExactAlarmSettings} /> : null}
       {health && !health.batteryUnrestricted ? <Banner text={t('battery_warning')} actionLabel={t('fix')} onAction={openBatterySettings} /> : null}
 
-      {adding ? (
-        <ReminderForm onClose={() => setAdding(false)} />
-      ) : (
-        <BigButton icon="+" label={t('add_reminder')} onPress={() => setAdding(true)} />
-      )}
+      {/* The form opens at the top; otherwise the day's schedule comes first and "Add" sits under it. */}
+      {adding ? <ReminderForm onClose={() => setAdding(false)} /> : null}
 
-      <Heading>{t('upcoming')}</Heading>
-      {upcoming.length === 0 ? <Body muted>{t('no_reminders')}</Body> : null}
-      {upcoming.map(({ r, at }) => (
+      {/* Week strip: today and the next 6 days, a dot where something is planned. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.space(1), paddingVertical: 4 }}>
+        {week.map((d, i) => {
+          const selected = i === dayOffset;
+          const [weekday, num] = formatDayChip(d, lang);
+          const busy = onDay(d).length > 0;
+          return (
+            <Pressable
+              key={d.toDateString()}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${i === 0 ? t('today_summary') : weekday} ${num}${busy ? `, ${onDay(d).length} ${t('reminders_title')}` : ''}`}
+              onPress={() => setDayOffset(i)}
+              style={[
+                {
+                  width: 68,
+                  minHeight: 92,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  backgroundColor: selected ? c.primary : c.surface,
+                  borderWidth: c.shadow ? 0 : c.borderWidth,
+                  borderColor: c.border,
+                },
+                c.shadow && !selected ? cardShadow : null,
+              ]}
+            >
+              <Text style={{ fontSize: theme.font.small, fontWeight: '700', color: selected ? c.onPrimary : c.textMuted }}>
+                {i === 0 ? t('today_summary') : weekday}
+              </Text>
+              <Text style={{ fontSize: theme.font.heading + 2, fontWeight: theme.bold, color: selected ? c.onPrimary : c.text }}>{num}</Text>
+              <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: busy ? (selected ? c.accent : c.primary) : 'transparent' }} />
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Heading>{dayOffset === 0 ? t('today_activities') : formatLongDate(day, lang)}</Heading>
+      {dayItems.length === 0 ? <Body muted>{t('no_reminders_day')}</Body> : null}
+      {dayItems.map(({ r, at }) => {
+        const finished = r.completed || (dayOffset === 0 && r.recurrence === 'none' && at < now);
+        return (
+          <Card key={r.id}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space(1.5), opacity: finished ? 0.6 : 1 }}>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: tint[r.type], alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 32 }} importantForAccessibility="no">
+                  {r.completed ? '✔️' : TYPE_ICON[r.type]}
+                </Text>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontSize: theme.font.heading, fontWeight: theme.bold, color: c.text }}>{formatTime(at, lang)}</Text>
+                <Text style={{ fontSize: theme.font.body + 1, fontWeight: '700', color: c.text, textDecorationLine: r.completed ? 'line-through' : 'none' }}>
+                  {r.title}
+                </Text>
+                <Text style={{ fontSize: theme.font.small, color: c.textMuted }}>{describeWhen(r, at, lang)}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: theme.space(1) }}>
+              {r.recurrence === 'none' ? (
+                r.completed ? (
+                  <BigButton compact style={{ flex: 1 }} variant="secondary" label={t('undo_done')} onPress={() => setCompleted(r, false, lang)} />
+                ) : (
+                  <BigButton compact style={{ flex: 1 }} label={t('mark_done')} onPress={() => setCompleted(r, true, lang)} />
+                )
+              ) : null}
+              <BigButton compact style={{ flex: 1 }} variant="secondary" label={t('delete')} onPress={() => remove(r)} accessibilityLabel={`${t('delete')} ${r.title}`} />
+            </View>
+          </Card>
+        );
+      })}
+
+      {!adding ? <BigButton icon="+" label={t('add_reminder')} onPress={() => setAdding(true)} /> : null}
+
+      {later.length ? <Heading>{t('later')}</Heading> : null}
+      {later.map(({ r, at }) => (
         <Card key={r.id}>
           <Text style={{ fontSize: theme.font.body + 2, fontWeight: theme.bold, color: c.text }}>
-            {r.type === 'medicine' ? '💊 ' : r.type === 'appointment' ? '📅 ' : '✔ '}
-            {r.title}
+            {TYPE_ICON[r.type]} {r.title}
           </Text>
           <Body muted>{describeWhen(r, at!, lang)}</Body>
-          <View style={{ flexDirection: 'row', gap: theme.space(1) }}>
-            {r.recurrence === 'none' ? (
-              <BigButton compact style={{ flex: 1 }} label={t('mark_done')} onPress={() => setCompleted(r, true, lang)} />
-            ) : null}
-            <BigButton compact style={{ flex: 1 }} variant="secondary" label={t('delete')} onPress={() => remove(r)} accessibilityLabel={`${t('delete')} ${r.title}`} />
-          </View>
+          <BigButton compact variant="secondary" label={t('delete')} onPress={() => remove(r)} accessibilityLabel={`${t('delete')} ${r.title}`} />
         </Card>
       ))}
 

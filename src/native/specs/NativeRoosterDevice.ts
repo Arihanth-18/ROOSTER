@@ -58,6 +58,13 @@ export interface Spec extends TurboModule {
   openAccessibilitySettings(): void;
   /** Fills the form in the app behind ROOSTER. JSON { app, filled: [{ key, label }], skipped } or { error }. */
   fillFormOnScreen(): Promise<string>;
+  /** Visible text of the app behind ROOSTER, for "read this message". JSON { app, lines } or { error }. */
+  readScreen(): Promise<string>;
+  /** JSON { installed, enabled, current } for a keyboard app (Wispr Flow). */
+  getKeyboardStatus(packageName: string): Promise<string>;
+  openKeyboardSettings(): void;
+  /** Android's "Choose keyboard" pop-up. */
+  showKeyboardPicker(): void;
   /** JSON: [{ label, packageName, preferred }] — installed notes apps (Keep, OnePlus Notes, Samsung Notes...). */
   getNotesApps(): Promise<string>;
   /** Shares the note into that notes app, where the user saves it; remembers it as the preferred app. */

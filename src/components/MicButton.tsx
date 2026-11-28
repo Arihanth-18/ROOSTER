@@ -5,7 +5,7 @@ import type { AssistantState } from '../assistant/AssistantProvider';
 import type { StringKey } from '../localization/i18n';
 import { RoosterAvatar } from './RoosterAvatar';
 
-const STATE_LABEL: Record<AssistantState, StringKey> = {
+export const STATE_LABEL: Record<AssistantState, StringKey> = {
   idle: 'state_idle',
   listening: 'state_listening',
   thinking: 'state_thinking',

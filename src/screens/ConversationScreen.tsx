@@ -1,16 +1,19 @@
 import React, { useRef, useState } from 'react';
+import { useRoute, type RouteProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../navigation/navigationRef';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { useApp } from '../app/AppContext';
 import { useAssistant } from '../assistant/AssistantProvider';
 import { Screen } from '../components/Screen';
-import { MicButton } from '../components/MicButton';
+import { STATE_LABEL } from '../components/MicButton';
 import { TypeBox, RepeatStopRow } from '../components/AssistantPanel';
 import { Banner } from '../components/Controls';
 import { formatTime } from '../utils/dates';
 
 export function ConversationScreen() {
   const { t, theme, settings } = useApp();
-  const { turns, state, partial, toggleListening, offline } = useAssistant();
+  const { turns, state, partial, offline } = useAssistant();
+  const route = useRoute<RouteProp<RootStackParamList, 'Conversation'>>();
   const [editing, setEditing] = useState<{ text: string; key: number } | null>(null);
   const listRef = useRef<FlatList>(null);
   const c = theme.colors;
@@ -19,6 +22,7 @@ export function ConversationScreen() {
     <Screen
       title={t('conversation_title')}
       scroll={false}
+      tab="talk"
       footer={
         <View style={{ gap: theme.space(1.5) }}>
           {state === 'listening' && partial ? (
@@ -26,14 +30,13 @@ export function ConversationScreen() {
               “{partial}”
             </Text>
           ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space(1.5) }}>
-            <MicButton state={state} onPress={toggleListening} size={96} />
-            <View style={{ flex: 1 }}>
-              <RepeatStopRow />
-            </View>
-          </View>
+          {/* The Talk button in the bottom bar is the microphone here; this row says what ROOSTER is doing. */}
+          <Text accessibilityLiveRegion="polite" style={{ fontSize: theme.font.heading, fontWeight: theme.bold, color: state === 'error' ? c.danger : c.text, textAlign: 'center' }}>
+            {t(STATE_LABEL[state])}
+          </Text>
+          <RepeatStopRow />
           {editing ? <Text style={{ fontSize: theme.font.small, color: c.textMuted }}>{t('heard_edit')}</Text> : null}
-          <TypeBox key={editing?.key ?? 0} initial={editing?.text ?? ''} />
+          <TypeBox key={editing?.key ?? route.params?.dictate ?? 0} initial={editing?.text ?? ''} autoFocus={!!route.params?.dictate && !editing} />
         </View>
       }
     >

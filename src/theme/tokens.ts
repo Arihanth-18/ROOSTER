@@ -17,27 +17,49 @@ export type Palette = {
   warningBg: string;
   focus: string;
   borderWidth: number;
+  /** Header band and page accents (light sky blue). */
+  hero: string;
+  /** Highlight colour: the Talk button, active items, icon circles (mint green). */
+  accent: string;
+  onAccent: string;
+  /** Soft tints for activity icons: medicine, appointment, task. */
+  tintMedicine: string;
+  tintAppointment: string;
+  tintTask: string;
+  /** Soft shadow under cards (off in the high-contrast modes, which use borders instead). */
+  shadow: boolean;
 };
 
-/** Blue & white. Standard meets WCAG AA (≥4.5:1 text); "aaa" targets ≥7:1 for all text. */
+/**
+ * Light sky blue, white cards, black text and buttons, mint-green accent — calm and easy to read.
+ * Text is near-black on white or light blue (≥ 12:1). Standard meets WCAG AA everywhere; "high" and
+ * "aaa" drop the soft shadows for solid borders and push every text colour to ≥ 7:1.
+ */
 const PALETTES: Record<AccessibilityPrefs['contrast'], Palette> = {
   standard: {
-    background: '#FFFFFF',
-    surface: '#F1F5FD',
-    surfaceAlt: '#E3ECFB',
-    text: '#0B1B33',
-    textMuted: '#3D4F6B',
-    primary: '#1D4ED8',
-    primaryPressed: '#1E3A8A',
+    background: '#EAF5FC',
+    surface: '#FFFFFF',
+    surfaceAlt: '#D7EEFA',
+    text: '#0B0F14',
+    textMuted: '#3B4754',
+    primary: '#0B0F14',
+    primaryPressed: '#2B3440',
     onPrimary: '#FFFFFF',
-    border: '#B9C8E4',
+    border: '#C5DCEB',
     danger: '#B42318',
     onDanger: '#FFFFFF',
-    success: '#067647',
+    success: '#0E6E47',
     warning: '#7A4B00',
     warningBg: '#FFF4D6',
-    focus: '#F59E0B',
+    focus: '#0B0F14',
     borderWidth: 1,
+    hero: '#BFE4F8',
+    accent: '#7EE0B5',
+    onAccent: '#0B0F14',
+    tintMedicine: '#C9F2DF',
+    tintAppointment: '#CDE8FA',
+    tintTask: '#E6E3FA',
+    shadow: true,
   },
   high: {
     background: '#FFFFFF',
@@ -56,6 +78,13 @@ const PALETTES: Record<AccessibilityPrefs['contrast'], Palette> = {
     warningBg: '#FFF4D6',
     focus: '#000000',
     borderWidth: 2,
+    hero: '#CFEAFB',
+    accent: '#7EE0B5',
+    onAccent: '#000000',
+    tintMedicine: '#C9F2DF',
+    tintAppointment: '#CDE8FA',
+    tintTask: '#E6E3FA',
+    shadow: false,
   },
   aaa: {
     background: '#FFFFFF',
@@ -74,6 +103,13 @@ const PALETTES: Record<AccessibilityPrefs['contrast'], Palette> = {
     warningBg: '#FFE89A',
     focus: '#000000',
     borderWidth: 3,
+    hero: '#FFFFFF',
+    accent: '#A7F3D0',
+    onAccent: '#000000',
+    tintMedicine: '#FFFFFF',
+    tintAppointment: '#FFFFFF',
+    tintTask: '#FFFFFF',
+    shadow: false,
   },
 };
 
@@ -107,7 +143,7 @@ export function buildTheme(prefs: AccessibilityPrefs): Theme {
     },
     touch: prefs.largeTouchTargets ? 72 : 56,
     space: (n: number) => n * (prefs.largeTouchTargets ? 9 : 8),
-    radius: 18,
+    radius: 24,
     bold: aaa ? '800' : '700',
   };
 }
