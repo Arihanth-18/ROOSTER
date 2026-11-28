@@ -393,6 +393,37 @@ class RoosterDeviceModule(private val ctx: ReactApplicationContext) : NativeRoos
     promise.resolve(launch(i) || launch(DeviceSettings.fallbackFor(page)))
   }
 
+  /**
+   * Hands-free switch: opens the page for `page`, flips the switch titled one of `labelsJson` to
+   * `on` using ROOSTER's accessibility service, then returns to ROOSTER.
+   * JSON { result: done | already | not_found | failed | not_enabled }.
+   */
+  override fun autoToggleSetting(page: String, labelsJson: String, on: Boolean, promise: Promise) {
+    val service = RoosterAccessibilityService.instance
+    if (service == null) { promise.resolve("""{"result":"not_enabled"}"""); return }
+    val labels = try {
+      val arr = JSONArray(labelsJson)
+      (0 until arr.length()).map { arr.getString(it) }
+    } catch (_: Exception) { emptyList() }
+    if (!launch(DeviceSettings.intentFor(ctx, page)) && !launch(DeviceSettings.fallbackFor(page))) {
+      promise.resolve("""{"result":"failed"}"""); return
+    }
+    io.execute {
+      try {
+        val deadline = System.currentTimeMillis() + 3000
+        while (System.currentTimeMillis() < deadline && service.activePackage().let { it == null || it == ctx.packageName }) {
+          Thread.sleep(150)
+        }
+        val res = service.toggleSetting(labels, on)
+        Thread.sleep(300)
+        service.goBack(res.optInt("pages", 1))
+        promise.resolve(res.toString())
+      } catch (e: Exception) {
+        promise.resolve(JSONObject().put("result", "failed").toString())
+      }
+    }
+  }
+
   /** New brightness in percent, or -1 when "Modify system settings" isn't allowed yet. */
   override fun setBrightness(action: String, promise: Promise) {
     promise.resolve(DeviceSettings.setBrightness(ctx, action).toDouble())

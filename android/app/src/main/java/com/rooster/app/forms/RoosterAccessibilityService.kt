@@ -80,6 +80,111 @@ class RoosterAccessibilityService : AccessibilityService() {
     return JSONObject().put("app", app).put("lines", JSONArray(kept))
   }
 
+  /**
+   * Flips a switch on the settings page in front, as the user asked by voice. Settings rows are a
+   * clickable row holding a title ("Wi-Fi") and a switch: find the title, take its row, read the switch,
+   * click the row if needed. If the row has no switch it leads to a sub-page ("Personal hotspot"):
+   * open it and look again (once). Confirms an "Are you sure?" pop-up. Never touches anything else.
+   * JSON { result: done | already | not_found | failed, pages } — `pages` is how many screens to go back.
+   */
+  fun toggleSetting(labels: List<String>, wantOn: Boolean): JSONObject {
+    val wanted = labels.map(::normLabel).filter { it.isNotEmpty() }.toSet()
+    var pages = 1
+    for (level in 0..1) {
+      val row = waitFor(3000) { findSettingRow(wanted) } ?: return JSONObject().put("result", "not_found").put("pages", pages)
+      val sw = findCheckable(row)
+      if (sw == null) {
+        if (level == 1 || !row.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+          return JSONObject().put("result", "not_found").put("pages", pages)
+        }
+        pages++
+        Thread.sleep(700)
+        continue
+      }
+      if (sw.isChecked == wantOn) return JSONObject().put("result", "already").put("pages", pages)
+      val target = if (sw.isClickable) sw else row
+      if (!target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return JSONObject().put("result", "failed").put("pages", pages)
+      // Wait for the switch to change; confirm a pop-up ("Turn off mobile data?") if one appears.
+      val deadline = System.currentTimeMillis() + 3000
+      var confirmed = false
+      while (System.currentTimeMillis() < deadline) {
+        Thread.sleep(250)
+        val now = waitFor(300) { findSettingRow(wanted) }?.let(::findCheckable)
+        if (now != null && now.isChecked == wantOn) return JSONObject().put("result", "done").put("pages", pages)
+        if (!confirmed) confirmed = confirmDialog()
+      }
+      return JSONObject().put("result", if (confirmed) "done" else "failed").put("pages", pages)
+    }
+    return JSONObject().put("result", "not_found").put("pages", pages)
+  }
+
+  private fun normLabel(s: String) =
+    s.lowercase().replace('‑', '-').replace(' ', ' ').replace(Regex("\\s+"), " ").trim()
+
+  private fun <T> waitFor(ms: Long, find: () -> T?): T? {
+    val deadline = System.currentTimeMillis() + ms
+    while (true) {
+      find()?.let { return it }
+      if (System.currentTimeMillis() >= deadline) return null
+      Thread.sleep(200)
+    }
+  }
+
+  /** The clickable row whose title exactly matches one of the labels (page headers aren't rows). */
+  private fun findSettingRow(wanted: Set<String>): AccessibilityNodeInfo? {
+    val root = rootInActiveWindow ?: return null
+    if (root.packageName == packageName) return null
+    var found: AccessibilityNodeInfo? = null
+    fun walk(n: AccessibilityNodeInfo?) {
+      if (n == null || found != null) return
+      val t = n.text?.toString() ?: n.contentDescription?.toString()
+      if (t != null && normLabel(t) in wanted && n.isVisibleToUser) {
+        var p: AccessibilityNodeInfo? = n
+        var hops = 0
+        while (p != null && hops < 5) {
+          if (p.isClickable) { found = p; return }
+          p = p.parent
+          hops++
+        }
+      }
+      for (i in 0 until n.childCount) walk(n.getChild(i))
+    }
+    walk(root)
+    return found
+  }
+
+  private fun findCheckable(n: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+    if (n == null) return null
+    if (n.isCheckable) return n
+    for (i in 0 until n.childCount) findCheckable(n.getChild(i))?.let { return it }
+    return null
+  }
+
+  /** Presses the confirming button of a small "Are you sure?" dialog, only if it also has a Cancel. */
+  private fun confirmDialog(): Boolean {
+    val root = rootInActiveWindow ?: return false
+    val positive = setOf("turn off", "turn on", "ok", "allow", "yes", "continue", "confirm", "enable", "disable",
+      "बंद करें", "चालू करें", "ठीक है", "ಆಫ್ ಮಾಡಿ", "ಆನ್ ಮಾಡಿ", "ಸರಿ")
+    val negative = setOf("cancel", "no", "रद्द करें", "ರದ್ದುಮಾಡಿ")
+    val buttons = ArrayList<AccessibilityNodeInfo>()
+    fun walk(n: AccessibilityNodeInfo?) {
+      if (n == null) return
+      if (n.isClickable && n.text != null) buttons.add(n)
+      for (i in 0 until n.childCount) walk(n.getChild(i))
+    }
+    walk(root)
+    if (buttons.size > 4 || buttons.none { normLabel(it.text.toString()) in negative }) return false
+    val ok = buttons.firstOrNull { normLabel(it.text.toString()) in positive } ?: return false
+    return ok.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+  }
+
+  fun goBack(times: Int) {
+    repeat(times.coerceIn(0, 3)) {
+      performGlobalAction(GLOBAL_ACTION_BACK)
+      Thread.sleep(350)
+    }
+  }
+
   /** JSON { app, filled: [{ key, label }], skipped } or { error }. */
   fun fillActiveForm(profile: Map<String, String>): JSONObject {
     val root = rootInActiveWindow ?: return JSONObject().put("error", "no_window")

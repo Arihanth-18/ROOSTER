@@ -17,6 +17,7 @@ import {
   isAccessibilityServiceEnabled,
   openAccessibilitySettings,
   mediaControl,
+  autoToggleSetting,
   getDeviceStatus,
   openSettingsPage,
   openUrl,
@@ -485,6 +486,24 @@ const STATUS_KEY: Partial<Record<PhoneSetting, keyof DeviceStatus>> = {
 const HAS_PANEL = new Set<PhoneSetting>(['wifi', 'mobile_data', 'nfc']);
 
 /**
+ * Where each switch lives and the titles it has on different phones (AOSP, OnePlus/Oppo, Samsung...)
+ * and phone languages. ROOSTER's accessibility service finds the row with one of these titles.
+ */
+const AUTO_TOGGLE: Partial<Record<PhoneSetting, { page: SettingsPage; labels: string[] }>> = {
+  wifi: { page: 'wifi', labels: ['Wi-Fi', 'WLAN', 'Use Wi-Fi', 'वाई-फ़ाई', 'वाई-फाई', 'ವೈ-ಫೈ'] },
+  mobile_data: { page: 'mobile_data', labels: ['Mobile data', 'Cellular data', 'मोबाइल डेटा', 'ಮೊಬೈಲ್ ಡೇಟಾ'] },
+  bluetooth: { page: 'bluetooth', labels: ['Bluetooth', 'Use Bluetooth', 'ब्लूटूथ', 'ಬ್ಲೂಟೂತ್'] },
+  airplane_mode: { page: 'airplane_mode', labels: ['Airplane mode', 'Aeroplane mode', 'Flight mode', 'हवाई जहाज़ मोड', 'फ़्लाइट मोड', 'ಏರ್‌ಪ್ಲೇನ್ ಮೋಡ್'] },
+  location: { page: 'location', labels: ['Location Services', 'Use location', 'Location', 'लोकेशन', 'ಸ್ಥಳ'] },
+  hotspot: { page: 'hotspot', labels: ['Personal hotspot', 'Wi-Fi hotspot', 'Mobile Hotspot', 'Portable hotspot', 'Hotspot'] },
+  battery_saver: { page: 'battery_saver', labels: ['Power saving mode', 'Battery Saver', 'Use Battery Saver', 'Power saving'] },
+  nfc: { page: 'nfc', labels: ['NFC', 'Use NFC'] },
+  dark_mode: { page: 'dark_mode', labels: ['Dark mode', 'Dark theme', 'Use Dark theme'] },
+};
+
+const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+/**
  * Brightness, auto-rotate, silent/vibrate and Do Not Disturb change directly (after a one-time
  * permission). Everything else Android reserves for the user: ROOSTER opens the switch for them.
  */
@@ -534,13 +553,40 @@ async function changePhoneSetting(ctx: ExecContext, r: IntentResult): Promise<Ex
     }
     default: {
       const key = STATUS_KEY[setting];
+      const stateWord = onOff ? t(`state_${onOff}`) : '';
       if (key && onOff) {
         const now = await getDeviceStatus().catch(() => null);
-        if (now && now[key] === (onOff === 'on')) return { say: t('setting_already', { name, state: t(`state_${onOff}`) }) };
+        if (now && now[key] === (onOff === 'on')) return { say: t('setting_already', { name, state: stateWord }) };
+      }
+      const auto = AUTO_TOGGLE[setting];
+      if (auto && onOff) {
+        // Airplane mode stops calls and SOS messages: always ask first.
+        if (setting === 'airplane_mode' && onOff === 'on') {
+          const ok = await ctx.ask({ message: t('confirm_airplane_on'), danger: true });
+          if (!ok.confirmed) return { say: t('cancelled') };
+        }
+        // Hands-free: ROOSTER flips the switch itself and comes back.
+        const res = await autoToggleSetting(auto.page, auto.labels, onOff === 'on').catch(() => 'failed' as const);
+        if (res === 'already') return { say: t('setting_already', { name, state: stateWord }) };
+        if (res === 'done') {
+          if (key) {
+            await wait(1200);
+            const after = await getDeviceStatus().catch(() => null);
+            if (after && after[key] !== (onOff === 'on')) return { say: t('setting_not_confirmed', { name }) };
+          }
+          return { say: t('setting_switched', { name, state: stateWord }) };
+        }
+        if (res === 'not_enabled') {
+          // Fall back to opening the switch, and say how to make it hands-free.
+          if (!(await openSettingsPage(auto.page))) return { say: t('action_failed') };
+          const tap = t(HAS_PANEL.has(setting) ? 'setting_panel_tap' : 'setting_page_tap', { name, state: stateWord });
+          return { say: `${tap} ${t('auto_toggle_hint')}` };
+        }
+        // not_found / failed: this phone's page looks different. Leave the switch open for the user.
       }
     }
   }
-  // Android doesn't let apps flip this one: open the panel or page with the switch.
+  // Open the panel or page with the switch for the user.
   const page: SettingsPage = setting === 'brightness' || setting === 'auto_rotate' ? 'display' : setting;
   if (!(await openSettingsPage(page))) return { say: t('action_failed') };
   if (!onOff) return { say: t('settings_page_opened', { name }) };

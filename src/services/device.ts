@@ -162,6 +162,14 @@ export type SettingsPage =
   | 'date' | 'language' | 'storage' | 'apps' | 'accessibility' | 'settings';
 
 export const openSettingsPage = (page: SettingsPage) => NativeDevice.openSettingsPage(page);
+
+export type AutoToggleResult = 'done' | 'already' | 'not_found' | 'failed' | 'not_enabled';
+
+/** Flips a phone setting with no tap (accessibility service), on the page that holds its switch. */
+export async function autoToggleSetting(page: SettingsPage, labels: string[], on: boolean): Promise<AutoToggleResult> {
+  const r = JSON.parse(await NativeDevice.autoToggleSetting(page, JSON.stringify(labels), on)) as { result: AutoToggleResult };
+  return r.result;
+}
 export const setBrightness = (action: 'up' | 'down' | 'max' | 'min' | 'auto') => NativeDevice.setBrightness(action);
 export const setAutoRotate = (on: boolean) => NativeDevice.setAutoRotate(on) as Promise<'ok' | 'no_permission' | 'failed'>;
 export const setRingerMode = (mode: 'normal' | 'vibrate' | 'silent') =>

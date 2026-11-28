@@ -64,6 +64,11 @@ export interface Spec extends TurboModule {
   getDeviceStatus(): Promise<string>;
   /** Quick panel or settings page so the user can flip a switch apps may not change. */
   openSettingsPage(page: string): Promise<boolean>;
+  /**
+   * Hands-free: opens the page, flips the switch titled one of `labelsJson` (JSON array) using the
+   * accessibility service, returns to ROOSTER. JSON { result: done | already | not_found | failed | not_enabled }.
+   */
+  autoToggleSetting(page: string, labelsJson: string, on: boolean): Promise<string>;
   /** up | down | max | min | auto. New brightness %, or -1 without "Modify system settings". */
   setBrightness(action: string): Promise<number>;
   /** "ok" | "no_permission" | "failed" */
