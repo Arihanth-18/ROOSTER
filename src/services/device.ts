@@ -75,7 +75,9 @@ export async function openWhatsAppChat(phone: string, text: string): Promise<'op
   const number = toWhatsAppNumber(phone);
   if (!number) return 'bad_number';
   try {
-    await Linking.openURL(`whatsapp://send?phone=${number}&text=${encodeURIComponent(text)}`);
+    // No text: just open the person's chat, with nothing typed.
+    const typed = text.trim() ? `&text=${encodeURIComponent(text)}` : '';
+    await Linking.openURL(`whatsapp://send?phone=${number}${typed}`);
     return 'opened';
   } catch {
     return 'not_installed';

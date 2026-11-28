@@ -16,6 +16,7 @@ export const INTENTS = [
   'read_text',
   'call_contact',
   'prepare_sms',
+  'open_chat',
   'emergency_help',
   'open_application',
   'play_media',

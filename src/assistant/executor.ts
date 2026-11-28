@@ -5,6 +5,7 @@ import { navigate } from '../navigation/navigationRef';
 import { SPEECH_LOCALE, type ChatTurn, type IntentResult, type PhoneSetting, type Reminder, type ScreenName } from '../types';
 import { factsRepo, notesRepo, remindersRepo, trustedRepo } from '../storage/repositories';
 import {
+  composeSms,
   getActiveNotifications,
   getDeviceContacts,
   getLaunchableApps,
@@ -48,7 +49,7 @@ import { formatLongDate, formatTime, parseLocalDateTime } from '../utils/dates';
 import { needsConfirmation } from './policy';
 import { ensurePermission } from './permissions';
 import { callConfirmed, messageConfirmed } from './comms';
-import { mentionsWhatsApp, parseOpenAndDo } from '../services/offlineParser';
+import { mentionsWhatsApp, parseOpenAndDo, parseOpenChat } from '../services/offlineParser';
 import { findAppTarget, pickPlayer } from '../utils/mediaApps';
 
 export type ExecContext = {
@@ -339,9 +340,25 @@ export async function execute(ctx: ExecContext, r: IntentResult, draft: Draft | 
       return sendSms(ctx, c, p.message, channel);
     }
 
+    case 'open_chat': {
+      if (!p.contact_name?.trim()) return { say: t('open_chat_who') };
+      const c = await resolveContact(ctx, p.contact_name);
+      if ('error' in c) return { say: c.error };
+      // Only opens the conversation; nothing is typed or sent, so no confirmation is needed.
+      if (p.channel === 'sms') {
+        return { say: (await composeSms([c.phone], '')) ? t('sms_chat_opened', { name: c.name }) : t('action_failed') };
+      }
+      const opened = await openWhatsAppChat(c.phone, '');
+      if (opened === 'opened') return { say: t('whatsapp_chat_opened', { name: c.name }) };
+      return { say: t(opened === 'bad_number' ? 'whatsapp_bad_number' : 'whatsapp_not_installed', { name: c.name }) };
+    }
+
     case 'open_application': {
       const name = p.app_name?.trim();
       if (!name) return { say: t('didnt_understand') };
+      // "open WhatsApp chat with Ravi" is a chat, not just the app.
+      const chat = parseOpenChat(ctx.utterance);
+      if (chat) return execute(ctx, { ...chat, confidence: r.confidence, source: r.source }, null);
       // "open Spotify and play X" must search/play, not just open the app.
       const compound = parseOpenAndDo(ctx.utterance) ?? parseOpenAndDo(`open ${name}`);
       if (compound) return execute(ctx, { ...compound, confidence: r.confidence, source: r.source }, null);

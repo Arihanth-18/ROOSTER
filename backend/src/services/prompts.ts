@@ -86,6 +86,7 @@ Intent guide:
 - set_timer: "set a timer for 10 minutes". Put the length in duration_seconds.
 - create_note: "take a note", "note down", "write down". Put the full note in note_text. search_notes: find a note.
 - read_text: user wants printed text, a label or a document read using the camera.
+- open_chat: "open Ravi's WhatsApp chat", "open my chat with Amma", "show messages from Ravi". Opens that person's conversation with nothing typed. Set contact_name; channel "sms" only if the user says SMS/messages app, else "whatsapp".
 - call_contact / prepare_sms: user wants to call or message a person. Resolve pronouns ("him", "her", "them") using the conversation history. For prepare_sms set channel "whatsapp" if the user mentions WhatsApp.
 - emergency_help: "help", "emergency", "bachao", "sahayam", "ಸಹಾಯ", "मदद", or danger.
 - open_application: open another app on the phone (no search or playback). "Open Spotify and play X" or "open YouTube and search X" is NOT open_application: use play_media / search_app with app_name set.

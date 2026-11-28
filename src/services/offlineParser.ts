@@ -338,6 +338,33 @@ function parseDeviceSetting(text: string): IntentResult | null {
   return result('device_setting', state ? { setting, state } : { setting });
 }
 
+// ---------------------------------------------------------------------------- open a person's chat
+
+/**
+ * "open Ravi's WhatsApp chat", "open WhatsApp chat with Ravi", "show my chat with Amma",
+ * "रवि की व्हाट्सएप चैट खोलो", "ರವಿ ಅವರ ಚಾಟ್ ತೆರೆ". Opens the conversation; nothing is typed or sent.
+ */
+const OPEN_CHAT: RegExp[] = [
+  /^(?:please\s+)?(?:open|show|go to)\s+(?:my\s+|the\s+)?(?:whats\s*app\s+|sms\s+)?(?:chat|conversation|messages?)\s+(?:with|of|for|from)\s+(.+?)(?:\s+(?:on|in)\s+whats\s*app)?[\s.!]*$/i,
+  /^(?:please\s+)?(?:open|show)\s+whats\s*app\s+(?:with|for|of)\s+(.+?)[\s.!]*$/i,
+  /^(?:please\s+)?(?:open|show|go to)\s+(.+?)(?:'s|’s)?\s+(?:whats\s*app\s+)?(?:chat|conversation)(?:\s+(?:on|in)\s+whats\s*app)?[\s.!]*$/i,
+  /^(?:व्हाट्स\s*[एऐ]प\s*(?:पर|में)\s*)?(.+?)\s*(?:की|का|के साथ)\s*(?:व्हाट्स\s*[एऐ]प\s*)?(?:चैट|बातचीत)\s*(?:खोलो|खोल दो|दिखाओ|खोलें)[\s।!]*$/,
+  /^(?:ವಾಟ್ಸ\S*\s*)?(.+?)\s*(?:ಅವರ|ಜೊತೆ|ಜೊತೆಗಿನ)?\s*(?:ವಾಟ್ಸ\S*\s*)?ಚಾಟ್\s*(?:ತೆರೆ|ತೆರೆಯಿರಿ|ತೋರಿಸು|ತೋರಿಸಿ|ಓಪನ್ ಮಾಡಿ)[\s.!]*$/,
+];
+const SMS_CHANNEL = /\b(?:sms|text messages?|messages app)\b|एसएमएस|ಎಸ್‌ಎಂಎಸ್/i;
+
+export function parseOpenChat(text: string): IntentResult | null {
+  for (const re of OPEN_CHAT) {
+    const m = re.exec(text.trim());
+    const name = m?.[1]?.trim().replace(/^(?:my|the)\s+/i, '');
+    if (!name || /^(?:whats\s*app|the|my|a|this)$/i.test(name)) continue;
+    // WhatsApp unless the user asked for SMS.
+    const channel = SMS_CHANNEL.test(text) && !WHATSAPP.test(text) ? 'sms' : 'whatsapp';
+    return result('open_chat', { contact_name: name, channel });
+  }
+  return null;
+}
+
 /** "Read this message", "translate this message to Kannada", "यह मैसेज पढ़ो", "ಈ ಸಂದೇಶ ಓದು". */
 const READ_SCREEN =
   /\b(?:read|what does)\s+(?:out\s+)?(?:this|the|that|my)?\s*(?:messages?|sms|chat|screen|whatsapp)\b|\btranslate\s+(?:this|the|that|my)?\s*(?:messages?|sms|chat|screen|text)?\b|(?:मैसेज|संदेश|एसएमएस|स्क्रीन)\s*(?:पढ़ो|पढ़कर सुनाओ|पढ़ कर सुनाओ|पढ़ें|सुनाओ)|(?:अनुवाद|ट्रांसलेट)\s*(?:करो|करें|कर दो)|(?:ಸಂದೇಶ|ಮೆಸೇಜ್|ಸ್ಕ್ರೀನ್)\s*(?:ಓದು|ಓದಿ|ಓದಿ ಹೇಳು)|ಅನುವಾದ\s*(?:ಮಾಡು|ಮಾಡಿ)|ಅನುವಾದಿಸು|ಅನುವಾದಿಸಿ/i;
@@ -374,6 +401,9 @@ export function parseOffline(input: string, now: Date = new Date()): IntentResul
   for (const [re, control] of MEDIA_CONTROLS) if (re.test(text)) return result('media_control', { control });
   if (REPEAT.test(text)) return result('repeat_last_response');
   if (EMERGENCY.test(text)) return result('emergency_help');
+
+  const chat = parseOpenChat(text);
+  if (chat) return chat;
 
   // "WhatsApp Ravi saying hi", "message Ravi on WhatsApp ...", "रवि को व्हाट्सएप पर मैसेज भेजो".
   const whatsapp = WHATSAPP.test(text);

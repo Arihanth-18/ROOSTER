@@ -344,6 +344,27 @@ describe('offline recogniser output (numbers as words)', () => {
   });
 });
 
+describe('opening a person\'s chat', () => {
+  const p = (s: string) => parseOffline(s);
+  it('opens a WhatsApp chat with nothing typed', () => {
+    const wa = { intent: 'open_chat', parameters: { contact_name: 'Ravi', channel: 'whatsapp' } };
+    expect(p("open Ravi's WhatsApp chat")).toMatchObject(wa);
+    expect(p('open WhatsApp chat with Ravi')).toMatchObject(wa);
+    expect(p('open whatsapp with Ravi')).toMatchObject(wa);
+    expect(p('open my chat with Ravi')).toMatchObject(wa);
+    expect(p('open Ravi chat on WhatsApp')).toMatchObject(wa);
+    expect(p('रवि की व्हाट्सएप चैट खोलो')).toMatchObject({ intent: 'open_chat', parameters: { contact_name: 'रवि', channel: 'whatsapp' } });
+    expect(p('व्हाट्सएप पर रवि की चैट खोलो')?.parameters.contact_name).toBe('रवि');
+    expect(p('ರವಿ ಅವರ ಚಾಟ್ ತೆರೆ')).toMatchObject({ intent: 'open_chat', parameters: { contact_name: 'ರವಿ' } });
+    expect(p('open sms messages with Ravi')?.parameters).toEqual({ contact_name: 'Ravi', channel: 'sms' });
+  });
+  it('leaves sending, the app and Conversation screen alone', () => {
+    expect(p('WhatsApp Ravi saying hi')?.intent).toBe('prepare_sms');
+    expect(p('open WhatsApp')?.intent).toBe('open_application');
+    expect(p('open spotify and play music')?.intent).toBe('play_media');
+  });
+});
+
 describe('media app choice', () => {
   const yt = 'com.google.android.youtube';
   const ytm = 'com.google.android.apps.youtube.music';
