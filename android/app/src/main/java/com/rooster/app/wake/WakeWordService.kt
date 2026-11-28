@@ -34,7 +34,7 @@ import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
-import org.vosk.android.StorageService
+import com.rooster.app.speech.VoskModels
 
 /**
  * Listens on-device (Vosk, no network) for "Hey ROOSTER" / "OK ROOSTER".
@@ -107,8 +107,7 @@ class WakeWordService : Service() {
     main.removeCallbacksAndMessages(null)
     stopRecognition()
     try { unregisterReceiver(conditions) } catch (_: Exception) { }
-    model?.close()
-    model = null
+    model = null // shared (VoskModels): offline voice commands may still use it, so don't close it
     status = "off"
     ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
     stopSelf()
@@ -148,18 +147,16 @@ class WakeWordService : Service() {
   private fun loadModel() {
     if (model != null) { evaluate(); return }
     status = "loading"
-    // Copies the bundled model from assets to app storage once (skipped when the uuid matches).
-    StorageService.unpack(
-      this, "model-en-in", "model",
-      { m ->
+    // Shared with offline voice commands; copied from assets to app storage once.
+    VoskModels.load(this, "model-en-in") { m ->
+      if (m == null) {
+        Log.e(TAG, "Model load failed")
+        status = "error"
+      } else {
         model = m
         evaluate()
-      },
-      { e ->
-        Log.e(TAG, "Model load failed: ${e.message}")
-        status = "error"
-      },
-    )
+      }
+    }
   }
 
   // ------------------------------------------------------------------ battery-aware on/off

@@ -2,7 +2,7 @@ import { matchContact, normalizeName, type MatchableContact } from '../src/utils
 import { transliterateToLatin } from '../src/utils/transliterate';
 import { nextOccurrence, occursOn, toLocalDateTime, parseLocalDateTime } from '../src/utils/dates';
 import { splitForSpeech } from '../src/utils/textChunks';
-import { parseOffline } from '../src/services/offlineParser';
+import { numberWordsToDigits, parseOffline } from '../src/services/offlineParser';
 import { toWhatsAppNumber } from '../src/utils/phone';
 import { findAppTarget, pickPlayer } from '../src/utils/mediaApps';
 
@@ -324,6 +324,23 @@ describe('phone settings and status (work offline)', () => {
     expect(p('volume up')?.intent).toBe('media_control');
     expect(p('open settings')?.intent).toBe('navigate');
     expect(p('take a note wifi password is on the router')?.intent).toBe('create_note');
+  });
+});
+
+describe('offline recogniser output (numbers as words)', () => {
+  const now = new Date(2026, 10, 28, 10, 0);
+  it('turns spoken numbers into digits', () => {
+    expect(numberWordsToDigits('set a timer for ten minutes')).toBe('set a timer for 10 minutes');
+    expect(numberWordsToDigits('alarm at six thirty a m')).toBe('alarm at 6:30 am');
+    expect(numberWordsToDigits('remind me at eight p m')).toBe('remind me at 8 pm');
+    expect(numberWordsToDigits('twenty five minutes')).toBe('25 minutes');
+  });
+  it('understands what Vosk writes', () => {
+    expect(parseOffline('set a timer for ten minutes')?.parameters.duration_seconds).toBe(600);
+    expect(parseOffline('set an alarm for six thirty a m', now)?.parameters.datetime).toBe('2026-11-29T06:30');
+    expect(parseOffline('remind me to take medicine at eight p m', now)?.parameters.datetime).toBe('2026-11-28T20:00');
+    expect(parseOffline('turn off why fi')?.parameters).toEqual({ setting: 'wifi', state: 'off' });
+    expect(parseOffline('play one direction songs')?.parameters.query).toBe('one direction songs');
   });
 });
 

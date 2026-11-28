@@ -78,6 +78,29 @@ const WEEKLY = /\b(every week|weekly)\b|हर हफ्ते|ಪ್ರತಿ �
 const EVENING = /\b(evening|night|shaam|raat)\b|शाम|रात|ಸಂಜೆ|ರಾತ್ರಿ/i;
 const MEDICINE = /\b(medicine|tablet|pill|dawai|goli)\b|दवा|दवाई|गोली|ಔಷಧ|ಮಾತ್ರೆ/i;
 
+const UNIT_WORDS: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+};
+const TEN_WORDS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50 };
+
+/**
+ * The offline recogniser writes numbers as words ("set a timer for ten minutes", "six thirty a m").
+ * Turn them into digits for time and duration parsing: "6:30 am", "10 minutes".
+ */
+export function numberWordsToDigits(text: string): string {
+  const units = Object.keys(UNIT_WORDS).join('|');
+  return text
+    .replace(new RegExp(`\\b(twenty|thirty|forty|fifty)(?:[\\s-](${units}))?\\b`, 'gi'), (_, tens: string, unit?: string) =>
+      String(TEN_WORDS[tens.toLowerCase()] + (unit ? UNIT_WORDS[unit.toLowerCase()] : 0)),
+    )
+    .replace(new RegExp(`\\b(${units})\\b`, 'gi'), w => String(UNIT_WORDS[w.toLowerCase()]))
+    .replace(/\b([ap])\s*\.?\s*m\b\.?/gi, (_, x: string) => `${x.toLowerCase()}m`)
+    .replace(/\b(\d{1,2})\s+o'?\s*clock\b/gi, '$1')
+    .replace(/\b(\d{1,2})\s+(\d{2})(?=\s*(?:am|pm)\b)/gi, '$1:$2')
+    .replace(/\b(\d{1,2})\s+([0-5]\d)\b(?!\s*(?:minutes?|mins?|hours?|seconds?|secs?))/gi, '$1:$2');
+}
+
 /** The next time matching "8 pm", "6:30", "kal 7 baje"... or null if no valid time was said. */
 function parseClockTime(text: string, now: Date): Date | null {
   const m = TIME.exec(text);
@@ -251,7 +274,7 @@ const SETTING_WORDS: Array<[RegExp, PhoneSetting]> = [
   [/\b(?:airplane|aeroplane|flight)\s*mode\b|फ़्लाइट\s*मोड|फ्लाइट\s*मोड|एयरप्लेन\s*मोड|ಫ್ಲೈಟ್\s*ಮೋಡ್|ಏರೋಪ್ಲೇನ್\s*ಮೋಡ್/i, 'airplane_mode'],
   [/\b(?:battery saver|power sav\w*|power saver)\b|बैटरी\s*सेवर|ಬ್ಯಾಟರಿ\s*ಸೇವರ್/i, 'battery_saver'],
   [/\b(?:do not disturb|dnd)\b|डू नॉट डिस्टर्ब|ಡು ನಾಟ್ ಡಿಸ್ಟರ್ಬ್/i, 'do_not_disturb'],
-  [/\b(?:wi-?fi|wireless)\b|वाई-?फ़ाई|वाई-?फाई|वाईफाई|ವೈ-?ಫೈ/i, 'wifi'],
+  [/\b(?:wi-?fi|wi fi|why fi|wireless)\b|वाई-?फ़ाई|वाई-?फाई|वाईफाई|ವೈ-?ಫೈ/i, 'wifi'],
   [/\b(?:mobile data|cellular data|data connection|internet)\b|मोबाइल\s*डेटा|इंटरनेट|ಮೊಬೈಲ್\s*ಡೇಟಾ|ಇಂಟರ್ನೆಟ್/i, 'mobile_data'],
   [/\bbluetooth\b|ब्लूटूथ|ಬ್ಲೂಟೂತ್/i, 'bluetooth'],
   [/\b(?:location|gps)\b|लोकेशन|जीपीएस|ಲೊಕೇಶನ್|ಜಿಪಿಎಸ್/i, 'location'],
@@ -383,12 +406,14 @@ export function parseOffline(input: string, now: Date = new Date()): IntentResul
       return note ? result('create_note', { note_text: note }) : result('create_note', {}, ['note_text']);
     }
   }
+  // Spoken numbers ("ten minutes", "six thirty am") as digits for times and durations.
+  const timeText = numberWordsToDigits(text);
   if (TIMER.test(text)) {
-    const seconds = parseDurationSeconds(text);
+    const seconds = parseDurationSeconds(timeText);
     return seconds ? result('set_timer', { duration_seconds: seconds }) : result('set_timer', {}, ['duration']);
   }
-  if (REMIND.test(text)) return parseReminder(text, now);
-  if (ALARM.test(text)) return parseAlarm(text, now);
+  if (REMIND.test(text)) return parseReminder(timeText, now);
+  if (ALARM.test(text)) return parseAlarm(timeText, now);
   const status = parseDeviceStatus(text);
   if (status) return status;
   const setting = parseDeviceSetting(text);

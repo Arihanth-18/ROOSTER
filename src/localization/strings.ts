@@ -117,7 +117,7 @@ export const en = {
 
   // speech errors
   speech_unavailable: 'Speech recognition is not available on this phone. Please use the typing box.',
-  speech_lang_unavailable: 'Voice input for this language is not installed. You can install it, or type instead.',
+  speech_lang_unavailable: 'Voice input for this language needs internet or an offline speech pack. Connect to the internet, download the offline pack in Google voice settings, or type instead. In English, ROOSTER can listen without internet.',
   tts_lang_missing: 'The voice for this language is not installed on this phone. Install it from voice settings.',
   install_voice: 'Install voice',
   heard_nothing: "I didn't hear anything. Please tap the microphone and try again.",
@@ -426,7 +426,7 @@ export const hi: Record<StringKey, string> = {
   perm_location: 'आपकी लोकेशन सिर्फ़ तब इस्तेमाल होती है जब आप SOS मैसेज में उसे भेजना चुनते हैं।',
   perm_denied: 'अनुमति नहीं मिली। आप इसे सेटिंग में दे सकते हैं।',
   speech_unavailable: 'इस फ़ोन पर आवाज़ पहचान उपलब्ध नहीं है। कृपया लिखकर बताएँ।',
-  speech_lang_unavailable: 'इस भाषा के लिए आवाज़ इनपुट इंस्टॉल नहीं है। आप इसे इंस्टॉल कर सकते हैं या लिख सकते हैं।',
+  speech_lang_unavailable: 'इस भाषा में बोलकर बताने के लिए इंटरनेट या ऑफ़लाइन स्पीच पैक चाहिए। इंटरनेट चालू करें, Google वॉइस सेटिंग में ऑफ़लाइन पैक डाउनलोड करें, या लिखकर बताएँ। अंग्रेज़ी में ROOSTER बिना इंटरनेट भी सुन सकता है।',
   tts_lang_missing: 'इस भाषा की आवाज़ फ़ोन पर इंस्टॉल नहीं है। वॉइस सेटिंग से इंस्टॉल करें।',
   install_voice: 'आवाज़ इंस्टॉल करें',
   heard_nothing: 'मुझे कुछ सुनाई नहीं दिया। माइक दबाकर फिर कोशिश करें।',
@@ -721,7 +721,7 @@ export const kn: Record<StringKey, string> = {
   perm_location: 'ನೀವು SOS ಸಂದೇಶದಲ್ಲಿ ಹಂಚಿಕೊಳ್ಳಲು ಆರಿಸಿದಾಗ ಮಾತ್ರ ನಿಮ್ಮ ಸ್ಥಳ ಬಳಸಲಾಗುತ್ತದೆ.',
   perm_denied: 'ಅನುಮತಿ ಸಿಗಲಿಲ್ಲ. ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ ನೀಡಬಹುದು.',
   speech_unavailable: 'ಈ ಫೋನ್‌ನಲ್ಲಿ ಧ್ವನಿ ಗುರುತಿಸುವಿಕೆ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ.',
-  speech_lang_unavailable: 'ಈ ಭಾಷೆಗೆ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಸ್ಥಾಪಿಸಿಲ್ಲ. ಸ್ಥಾಪಿಸಬಹುದು ಅಥವಾ ಟೈಪ್ ಮಾಡಬಹುದು.',
+  speech_lang_unavailable: 'ಈ ಭಾಷೆಯಲ್ಲಿ ಮಾತಾಡಲು ಇಂಟರ್ನೆಟ್ ಅಥವಾ ಆಫ್‌ಲೈನ್ ಸ್ಪೀಚ್ ಪ್ಯಾಕ್ ಬೇಕು. ಇಂಟರ್ನೆಟ್ ಆನ್ ಮಾಡಿ, Google ಧ್ವನಿ ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ ಆಫ್‌ಲೈನ್ ಪ್ಯಾಕ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ, ಅಥವಾ ಟೈಪ್ ಮಾಡಿ. ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ROOSTER ಇಂಟರ್ನೆಟ್ ಇಲ್ಲದೆಯೂ ಕೇಳಬಲ್ಲದು.',
   tts_lang_missing: 'ಈ ಭಾಷೆಯ ಧ್ವನಿ ಫೋನ್‌ನಲ್ಲಿ ಸ್ಥಾಪಿಸಿಲ್ಲ. ಧ್ವನಿ ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಿಂದ ಸ್ಥಾಪಿಸಿ.',
   install_voice: 'ಧ್ವನಿ ಸ್ಥಾಪಿಸಿ',
   heard_nothing: 'ನನಗೆ ಏನೂ ಕೇಳಿಸಲಿಲ್ಲ. ಮೈಕ್ ಒತ್ತಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',

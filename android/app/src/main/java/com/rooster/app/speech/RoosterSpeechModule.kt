@@ -17,6 +17,8 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.rooster.app.specs.NativeRoosterSpeechSpec
 import java.util.Locale
+import org.vosk.Recognizer
+import org.vosk.android.SpeechService
 
 class RoosterSpeechModule(private val ctx: ReactApplicationContext) : NativeRoosterSpeechSpec(ctx) {
 
@@ -54,7 +56,18 @@ class RoosterSpeechModule(private val ctx: ReactApplicationContext) : NativeRoos
     main.post {
       recognizer?.destroy()
       recognizer = null
+      stopVosk()
+      voskFallbackUsed = false
+      // No internet and an offline model is bundled for this language: listen fully on the phone.
+      val asset = VoskModels.assetFor(ctx, locale)
+      currentAsset = asset
+      if (asset != null && !com.rooster.app.device.DeviceSettings.isOnline(ctx)) {
+        voskFallbackUsed = true
+        startVosk(asset)
+        return@post
+      }
       if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
+        if (asset != null) { voskFallbackUsed = true; startVosk(asset); return@post }
         emit("RoosterSpeech.error", "code" to "unavailable", "message" to "Speech recognition service not available")
         return@post
       }
@@ -83,7 +96,11 @@ class RoosterSpeechModule(private val ctx: ReactApplicationContext) : NativeRoos
   }
 
   override fun stopListening() {
-    main.post { recognizer?.stopListening() }
+    main.post {
+      // Vosk: stop() delivers what was heard so far through onFinalResult.
+      val v = vosk
+      if (v != null) v.stop() else recognizer?.stopListening()
+    }
   }
 
   override fun cancelListening() {
@@ -91,7 +108,78 @@ class RoosterSpeechModule(private val ctx: ReactApplicationContext) : NativeRoos
       recognizer?.cancel()
       recognizer?.destroy()
       recognizer = null
+      voskDone = true
+      stopVosk()
     }
+  }
+
+  // ---------------------------------------------------------------- offline recognition (Vosk)
+
+  private var vosk: SpeechService? = null
+  private var voskDone = true
+  private var voskPartial = ""
+  private var currentAsset: String? = null
+  private var voskFallbackUsed = false
+
+  /** Listens with the bundled on-device model; emits the same events as Android's recognizer. */
+  private fun startVosk(asset: String) {
+    voskDone = false
+    voskPartial = ""
+    VoskModels.load(ctx, asset) { model ->
+      if (voskDone) return@load // cancelled while the model was loading
+      if (model == null) {
+        finishVosk(null, "unavailable")
+        return@load
+      }
+      try {
+        val rec = Recognizer(model, 16000f)
+        vosk = SpeechService(rec, 16000f).also { it.startListening(voskListener, 12_000) }
+        emit("RoosterSpeech.state", "state" to "ready")
+      } catch (e: Exception) {
+        finishVosk(null, "audio")
+      }
+    }
+  }
+
+  private fun stopVosk() {
+    vosk?.let {
+      try { it.stop(); it.shutdown() } catch (_: Exception) { }
+    }
+    vosk = null
+  }
+
+  /** Emits the result once (text) or an error (code), then releases the microphone. */
+  private fun finishVosk(text: String?, errorCode: String = "no_match") {
+    if (voskDone) return
+    voskDone = true
+    if (!text.isNullOrBlank()) emit("RoosterSpeech.result", "text" to text)
+    else emit("RoosterSpeech.error", "code" to errorCode, "message" to "Offline recognition: $errorCode")
+    main.post { stopVosk() }
+  }
+
+  private fun voskText(json: String?, key: String) = try {
+    org.json.JSONObject(json ?: "{}").optString(key).trim()
+  } catch (_: Exception) { "" }
+
+  private val voskListener = object : org.vosk.android.RecognitionListener {
+    override fun onPartialResult(hypothesis: String?) {
+      val p = voskText(hypothesis, "partial")
+      if (p.isNotEmpty() && p != voskPartial) {
+        if (voskPartial.isEmpty()) emit("RoosterSpeech.state", "state" to "speech_start")
+        voskPartial = p
+        emit("RoosterSpeech.partial", "text" to p)
+      }
+    }
+    // A pause after speech ends the utterance, like Android's recognizer.
+    override fun onResult(hypothesis: String?) {
+      val t = voskText(hypothesis, "text")
+      if (t.isNotEmpty()) finishVosk(t)
+    }
+    override fun onFinalResult(hypothesis: String?) {
+      finishVosk(voskText(hypothesis, "text").ifEmpty { voskPartial }, if (voskPartial.isEmpty()) "no_speech" else "no_match")
+    }
+    override fun onError(exception: Exception?) = finishVosk(null, "audio")
+    override fun onTimeout() = finishVosk(voskPartial, "no_speech")
   }
 
   private val listener = object : RecognitionListener {
@@ -131,6 +219,15 @@ class RoosterSpeechModule(private val ctx: ReactApplicationContext) : NativeRoos
         12 -> "language_not_supported" // ERROR_LANGUAGE_NOT_SUPPORTED (API 31)
         13 -> "language_unavailable" // ERROR_LANGUAGE_UNAVAILABLE (API 31)
         else -> "unknown"
+      }
+      // No internet or no language pack for Google's recognizer: retry once with the on-device model.
+      val asset = currentAsset
+      if (asset != null && !voskFallbackUsed && code in setOf("network", "server", "language_unavailable", "language_not_supported")) {
+        voskFallbackUsed = true
+        recognizer?.destroy()
+        recognizer = null
+        startVosk(asset)
+        return
       }
       emit("RoosterSpeech.error", "code" to code, "message" to "Speech error $error")
     }
